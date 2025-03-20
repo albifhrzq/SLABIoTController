@@ -1,98 +1,98 @@
 # Aquarium LED Controller
 
-Sebuah pengontrol lampu akuarium berbasis ESP32 yang memungkinkan pengaturan intensitas LED berdasarkan waktu menggunakan RTC DS3231. Kontroler dapat diatur melalui aplikasi Flutter via koneksi Bluetooth.
+An ESP32-based aquarium lighting controller that allows LED intensity adjustment based on time using the RTC DS3231 module. The controller can be configured via a Flutter application through Bluetooth connection.
 
-## Fitur
+## Features
 
-- Kontrol 7 warna LED terpisah (Royal Blue, Biru, UV, Violet, Merah, Hijau, Putih)
-- Pengaturan intensitas berdasarkan waktu (pagi, siang, malam)
-- Penggunaan RTC DS3231 untuk penghitungan waktu yang akurat
-- Perpindahan halus antara berbagai profil pencahayaan
-- Koneksi Bluetooth untuk mengontrol dari aplikasi Flutter
-- Mode otomatis dan manual
-- Penyesuaian profil pencahayaan dan rentang waktu melalui aplikasi
+- Control 7 separate LED colors (Royal Blue, Blue, UV, Violet, Red, Green, White)  
+- Time-based intensity control (morning, afternoon, evening, night)  
+- Uses **RTC DS3231** for accurate timekeeping  
+- Smooth transition between different lighting profiles  
+- Bluetooth connection for control via a Flutter app  
+- Automatic and manual modes  
+- Lighting profile and time range customization through the app  
 
-## Kebutuhan Hardware
+## Hardware Requirements
 
-- ESP32 (CH340)
-- RTC DS3231
-- 7 Channel PWM LED Driver
-- LED Strip/Module dengan warna:
-  - Royal Blue
-  - Biru
-  - UV
-  - Violet
-  - Merah
-  - Hijau
-  - Putih
-- Power Supply sesuai kebutuhan LED
+- ESP32 (CH340)  
+- RTC DS3231  
+- 7-Channel PWM LED Driver  
+- LED Strip/Modules with the following colors:
+  - Royal Blue  
+  - Blue  
+  - UV  
+  - Violet  
+  - Red  
+  - Green  
+  - White  
+- Power supply suitable for the LED setup  
 
-## Pengkabelan
+## Wiring
 
-Sambungan pin:
+| Component        | ESP32 Pin |
+|------------------|-----------|
+| Royal Blue LED   | GPIO25    |
+| Blue LED         | GPIO26    |
+| UV LED           | GPIO27    |
+| Violet LED       | GPIO14    |
+| Red LED          | GPIO12    |
+| Green LED        | GPIO13    |
+| White LED        | GPIO15    |
+| RTC DS3231 SDA   | GPIO21    |
+| RTC DS3231 SCL   | GPIO22    |
 
-| Komponen | Pin ESP32 |
-|----------|-----------|
-| Royal Blue LED | GPIO25 |
-| Blue LED | GPIO26 |
-| UV LED | GPIO27 |
-| Violet LED | GPIO14 |
-| Red LED | GPIO12 |
-| Green LED | GPIO13 |
-| White LED | GPIO15 |
-| RTC DS3231 SDA | GPIO21 |
-| RTC DS3231 SCL | GPIO22 |
+## Installation
 
-## Instalasi
+1. Install PlatformIO on VS Code  
+2. Open this project in PlatformIO  
+3. Download all required dependencies  
+4. Compile and upload the code to your ESP32 device  
 
-1. Pasang PlatformIO di VS Code
-2. Buka projek ini
-3. Unduh semua dependensi yang diperlukan
-4. Kompilasi dan unggah ke perangkat ESP32
+## Usage
 
-## Penggunaan
+### Automatic Mode
 
-### Mode Otomatis
+Once uploaded, the system will automatically run lighting profiles based on the RTC's time:
 
-Setelah diunggah, sistem akan secara otomatis menjalankan profil pencahayaan berdasarkan waktu dari RTC:
+- **Morning (07:00–10:00)**: Soft lighting dominated by white and blue LEDs  
+- **Afternoon (10:00–17:00)**: Bright lighting with full intensity  
+- **Evening (17:00–21:00)**: Warm lighting with red-dominated tones  
+- **Night (21:00–07:00)**: Dim lighting with a blue-dominated atmosphere  
 
-- **Pagi (07:00-10:00)**: Pencahayaan lembut dengan dominasi warna putih dan biru
-- **Siang (10:00-17:00)**: Pencahayaan terang dengan intensitas penuh
-- **Sore (17:00-21:00)**: Pencahayaan hangat dengan dominasi warna merah
-- **Malam (21:00-07:00)**: Pencahayaan redup dengan dominasi warna biru
+### Control via Flutter App
 
-### Kontrol via Aplikasi Flutter
+The system can be controlled via a Flutter app connected through Bluetooth. App features include:
 
-Sistem dapat dikontrol melalui aplikasi Flutter yang terhubung via Bluetooth. Fitur aplikasi meliputi:
+1. **Manual Control**: Adjust intensity of each LED individually  
+2. **Automatic Mode**: Run time-based lighting cycles  
+3. **Profile Customization**: Modify lighting profiles for each time period  
+4. **Time Customization**: Set custom time ranges for each lighting profile  
 
-1. **Kontrol Manual**: Mengatur intensitas setiap LED secara terpisah
-2. **Mode Otomatis**: Menjalankan siklus pencahayaan otomatis berdasarkan waktu
-3. **Kustomisasi Profil**: Mengubah profil pencahayaan untuk setiap waktu (pagi, siang, sore, malam)
-4. **Kustomisasi Waktu**: Mengatur rentang waktu untuk setiap profil pencahayaan
+### Connecting the App
 
-### Menghubungkan Aplikasi
+1. Ensure Bluetooth is enabled on your Android/iOS device  
+2. Open the Flutter Aquarium Controller app  
+3. Scan for nearby Bluetooth devices  
+4. Select **"Aquarium LED Controller"** from the list  
+5. Once connected, the app will display current status and settings  
 
-1. Pastikan Bluetooth aktif di perangkat Android/iOS
-2. Buka aplikasi Flutter Aquarium Controller
-3. Scan perangkat Bluetooth terdekat
-4. Pilih "Aquarium LED Controller" dari daftar
-5. Setelah terhubung, aplikasi akan menampilkan status dan pengaturan saat ini
+## Customization
 
-## Kustomisasi
+For developers, the code can be customized as follows:
 
-Untuk pengembang, kode dapat dikustomisasi dengan cara berikut:
+- **Lighting Profiles**: Edit default values in `setDefaultProfiles()` inside `LedController.cpp`  
+- **Time Ranges**: Modify default times in the `LedController` constructor  
+- **Bluetooth UUID**: Adjust UUID in `BluetoothService.h` if needed  
 
-1. **Profil Pencahayaan**: Edit nilai default di fungsi `setDefaultProfiles()` di `LedController.cpp`
-2. **Rentang Waktu**: Ubah nilai waktu default di konstruktor `LedController`
-3. **UUID Bluetooth**: Sesuaikan UUID di `BluetoothService.h` jika diperlukan
+## Flutter App
 
-## Aplikasi Flutter
+The source code for the companion Flutter application is available at:  
+[**Aquarium Controller Flutter App**](https://github.com/username/aquarium-flutter-app)
 
-Kode sumber untuk aplikasi Flutter pendamping tersedia di: [Aquarium Controller Flutter App](https://github.com/username/aquarium-flutter-app)
+### App Features
 
-Fitur aplikasi:
-- Antarmuka yang intuitif untuk kontrol lampu
-- Pengatur intensitas dengan slider
-- Penjadwalan dan pengaturan profil
-- Visualisasi warna dan pencahayaan
-- Penyimpanan pengaturan lokal 
+- Intuitive interface for light control  
+- Intensity sliders for each LED  
+- Scheduling and profile management  
+- Lighting color visualization  
+- Local settings storage  
