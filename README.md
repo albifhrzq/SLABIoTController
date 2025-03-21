@@ -1,98 +1,115 @@
-# Aquarium LED Controller
+# SLAB IoT Aquarium Controller
 
-An ESP32-based aquarium lighting controller that allows LED intensity adjustment based on time using the RTC DS3231 module. The controller can be configured via a Flutter application through Bluetooth connection.
+An ESP32-based aquarium LED controller that allows users to set lighting profiles for different times throughout the day. This system uses a Real-Time Clock (RTC) for time tracking and ESP32 for LED control via PWM.
 
 ## Features
 
-- Control 7 separate LED colors (Royal Blue, Blue, UV, Violet, Red, Green, White)  
-- Time-based intensity control (morning, afternoon, evening, night)  
-- Uses **RTC DS3231** for accurate timekeeping  
-- Smooth transition between different lighting profiles  
-- Bluetooth connection for control via a Flutter app  
-- Automatic and manual modes  
-- Lighting profile and time range customization through the app  
+- Control of 7 separate LED channels (Royal Blue, Blue, UV, Violet, Red, Green, White)
+- Time-based automatic operation mode with 4 lighting profiles (morning, midday, evening, night)
+- Manual operation mode for direct LED intensity adjustment
+- WiFi interface for setup and monitoring
+- RESTful web API interface for client application integration
+- Settings storage using ESP32 preferences
 
-## Hardware Requirements
+## Transition from Bluetooth to WiFi
 
-- ESP32 (CH340)  
-- RTC DS3231  
-- 7-Channel PWM LED Driver  
-- LED Strip/Modules with the following colors:
-  - Royal Blue  
-  - Blue  
-  - UV  
-  - Violet  
-  - Red  
-  - Green  
-  - White  
-- Power supply suitable for the LED setup  
+This project originally used Bluetooth Low Energy (BLE) for communication with client applications. Now, the project has been converted to use WiFi and HTTP protocol instead of BLE. Key changes include:
 
-## Wiring
+1. Replacement of `BluetoothService` with `WiFiService`
+2. Implementation of an asynchronous web server using ESPAsyncWebServer
+3. Exposing RESTful API for all the same functionality that was available through BLE
 
-| Component        | ESP32 Pin |
-|------------------|-----------|
-| Royal Blue LED   | GPIO25    |
-| Blue LED         | GPIO26    |
-| UV LED           | GPIO27    |
-| Violet LED       | GPIO14    |
-| Red LED          | GPIO12    |
-| Green LED        | GPIO13    |
-| White LED        | GPIO15    |
-| RTC DS3231 SDA   | GPIO21    |
-| RTC DS3231 SCL   | GPIO22    |
+## Required Hardware
 
-## Installation
+- ESP32 Development Board
+- RTC DS3231
+- MOSFET or LED driver for each channel
+- Suitable power supply for LEDs
+- Aquarium LEDs (Royal Blue, Blue, UV, Violet, Red, Green, White)
 
-1. Install PlatformIO on VS Code  
-2. Open this project in PlatformIO  
-3. Download all required dependencies  
-4. Compile and upload the code to your ESP32 device  
+## Hardware Connections
 
-## Usage
+```
+ESP32 GPIO25 -> MOSFET Gate for Royal Blue LED
+ESP32 GPIO26 -> MOSFET Gate for Blue LED
+ESP32 GPIO27 -> MOSFET Gate for UV LED
+ESP32 GPIO14 -> MOSFET Gate for Violet LED
+ESP32 GPIO12 -> MOSFET Gate for Red LED
+ESP32 GPIO13 -> MOSFET Gate for Green LED
+ESP32 GPIO23 -> MOSFET Gate for White LED
+ESP32 SDA (GPIO21) -> SDA on RTC DS3231
+ESP32 SCL (GPIO22) -> SCL on RTC DS3231
+```
 
-### Automatic Mode
+## Software Setup
 
-Once uploaded, the system will automatically run lighting profiles based on the RTC's time:
+1. Clone this repository
+2. Open the project in PlatformIO
+3. Edit WIFI_SSID and WIFI_PASSWORD in src/main.cpp with your WiFi credentials
+4. Build and upload to ESP32
 
-- **Morning (07:00–10:00)**: Soft lighting dominated by white and blue LEDs  
-- **Afternoon (10:00–17:00)**: Bright lighting with full intensity  
-- **Evening (17:00–21:00)**: Warm lighting with red-dominated tones  
-- **Night (21:00–07:00)**: Dim lighting with a blue-dominated atmosphere  
+## API Endpoints
 
-### Control via Flutter App
+The server provides several RESTful API endpoints:
 
-The system can be controlled via a Flutter app connected through Bluetooth. App features include:
+- `GET /api/profile?type=[morning|midday|evening|night]` - Get lighting profile by type
+- `POST /api/profile` - Set lighting profile (JSON format)
+- `GET /api/timeranges` - Get time ranges for each profile
+- `POST /api/timeranges` - Set time ranges (JSON format)
+- `POST /api/manual` - Control LEDs manually (JSON format)
+- `GET /api/time` - Get current time from RTC
+- `GET /api/mode` - Get current operation mode (manual/auto)
+- `POST /api/mode` - Set operation mode (JSON format)
 
-1. **Manual Control**: Adjust intensity of each LED individually  
-2. **Automatic Mode**: Run time-based lighting cycles  
-3. **Profile Customization**: Modify lighting profiles for each time period  
-4. **Time Customization**: Set custom time ranges for each lighting profile  
+## API Request Examples
 
-### Connecting the App
+### Get Current Profile
 
-1. Ensure Bluetooth is enabled on your Android/iOS device  
-2. Open the Flutter Aquarium Controller app  
-3. Scan for nearby Bluetooth devices  
-4. Select **"Aquarium LED Controller"** from the list  
-5. Once connected, the app will display current status and settings  
+```
+GET /api/profile
+```
 
-## Customization
+### Set Profile
 
-For developers, the code can be customized as follows:
+```json
+POST /api/profile
+{
+  "type": "morning",
+  "profile": {
+    "royalBlue": 100,
+    "blue": 120,
+    "uv": 50,
+    "violet": 40,
+    "red": 200,
+    "green": 180,
+    "white": 150
+  }
+}
+```
 
-- **Lighting Profiles**: Edit default values in `setDefaultProfiles()` inside `LedController.cpp`  
-- **Time Ranges**: Modify default times in the `LedController` constructor  
-- **Bluetooth UUID**: Adjust UUID in `BluetoothService.h` if needed  
+### Control LED Manually
 
-## Flutter App
+```json
+POST /api/manual
+{
+  "led": "royalBlue",
+  "value": 200
+}
+```
 
-The source code for the companion Flutter application is available at:  
-[**Aquarium Controller Flutter App**](https://github.com/username/aquarium-flutter-app)
+### Change Operation Mode
 
-### App Features
+```json
+POST /api/mode
+{
+  "mode": "auto"
+}
+```
 
-- Intuitive interface for light control  
-- Intensity sliders for each LED  
-- Scheduling and profile management  
-- Lighting color visualization  
-- Local settings storage  
+## Flutter App Integration
+
+The Flutter application needs to be updated to use HTTP protocol instead of BLE. Use the `http` package to make API requests to the endpoints provided by the ESP32.
+
+## License
+
+MIT

@@ -3,7 +3,7 @@
 #include <RTClib.h>
 #include <ArduinoJson.h>
 #include "LedController.h"
-#include "BluetoothService.h"
+#include "WiFiService.h"
 
 // Pin definitions
 #define PIN_ROYAL_BLUE 25  // Royal Blue LED
@@ -27,10 +27,14 @@
 #define PWM_FREQ      5000  // Frequency in Hz
 #define PWM_RESOLUTION    8  // 8-bit resolution (0-255)
 
+// WiFi credentials
+#define WIFI_SSID "SLAB"
+#define WIFI_PASSWORD "12345678"
+
 // Global objects
 RTC_DS3231 rtc;  // RTC instance
 LedController* ledController;  // LED controller
-BluetoothService* bluetoothService;  // Bluetooth service
+WiFiService* wifiService;  // WiFi service
 
 void setup() {
   // Start serial communication
@@ -64,9 +68,9 @@ void setup() {
   // Initialize LED controller
   ledController->begin();
   
-  // Create and initialize Bluetooth service
-  bluetoothService = new BluetoothService(ledController);
-  bluetoothService->begin();
+  // Create and initialize WiFi service
+  wifiService = new WiFiService(ledController, WIFI_SSID, WIFI_PASSWORD);
+  wifiService->begin();
   
   Serial.println("Setup complete.");
   
@@ -91,8 +95,8 @@ void loop() {
   // Update LED controller
   ledController->update();
   
-  // Update BLE characteristics (typically happens only when connected)
-  bluetoothService->updateCharacteristics();
+  // Update WiFi service (in case of any periodic tasks)
+  wifiService->update();
   
   // Short delay to prevent overwhelming the system
   delay(1000);
