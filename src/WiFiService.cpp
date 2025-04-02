@@ -9,46 +9,21 @@ WiFiService::WiFiService(LedController* ledController, const char* ssid, const c
 }
 
 void WiFiService::begin() {
-  // Hubungkan ke WiFi
-  Serial.println("Connecting to WiFi...");
-  WiFi.begin(ssid, password);
+  // Start in Access Point mode directly
+  Serial.println("Starting Access Point mode...");
   
-  // Tunggu koneksi
-  uint8_t timeout = 0;
-  while (WiFi.status() != WL_CONNECTED && timeout < 20) {
-    delay(500);
-    Serial.print(".");
-    timeout++;
-  }
+  // Create access point with the SSID and password provided in the constructor
+  WiFi.softAP(ssid, password);
+  Serial.print("Access Point IP address: ");
+  Serial.println(WiFi.softAPIP());
   
-  if (WiFi.status() == WL_CONNECTED) {
-    deviceConnected = true;
-    Serial.println("");
-    Serial.print("Connected to WiFi with IP: ");
-    Serial.println(WiFi.localIP());
-    
-    // Setup endpoint API
-    setupApiEndpoints();
-    
-    // Mulai server
-    server->begin();
-    Serial.println("HTTP server started");
-  } else {
-    Serial.println("");
-    Serial.println("Failed to connect to WiFi. Starting access point mode...");
-    
-    // Jika gagal terhubung, buat access point
-    WiFi.softAP("Aquarium-LED-Controller", "12345678");
-    Serial.print("Access Point IP address: ");
-    Serial.println(WiFi.softAPIP());
-    
-    // Setup endpoint API
-    setupApiEndpoints();
-    
-    // Mulai server
-    server->begin();
-    Serial.println("HTTP server started in AP mode");
-  }
+  // Setup endpoint API
+  setupApiEndpoints();
+  
+  // Start server
+  server->begin();
+  Serial.println("HTTP server started in AP mode");
+  deviceConnected = true;
 }
 
 void WiFiService::setupApiEndpoints() {
@@ -351,6 +326,28 @@ IPAddress WiFiService::getIP() {
 }
 
 void WiFiService::update() {
-  // Tidak ada yang perlu dilakukan di sini karena server berjalan secara asinkron
-  // Metode ini disediakan untuk kompatibilitas dengan class BluetoothService
+  // Check AP status periodically
+  static unsigned long lastCheck = 0;
+  if (millis() - lastCheck > 30000) { // Check every 30 seconds
+    lastCheck = millis();
+    
+    // Check if any clients are connected to the AP
+    if (WiFi.softAPgetStationNum() > 0) {
+      if (!deviceConnected) {
+        Serial.println("Client connected to AP");
+        deviceConnected = true;
+      }
+    } else {
+      if (deviceConnected) {
+        Serial.println("No clients connected to AP");
+        deviceConnected = false;
+      }
+    }
+    
+    // Print status info
+    Serial.print("AP status: ");
+    Serial.print(deviceConnected ? "Active with " : "Active but no clients, ");
+    Serial.print(WiFi.softAPgetStationNum());
+    Serial.println(" client(s) connected");
+  }
 }

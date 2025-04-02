@@ -27,9 +27,9 @@
 #define PWM_FREQ      5000  // Frequency in Hz
 #define PWM_RESOLUTION    8  // 8-bit resolution (0-255)
 
-// WiFi credentials
-#define WIFI_SSID "SLAB"
-#define WIFI_PASSWORD "12345678"
+// WiFi AP mode settings
+#define AP_SSID "SLAB-Aquarium-LED"
+#define AP_PASSWORD "12345678"
 
 // Global objects
 RTC_DS3231 rtc;  // RTC instance
@@ -68,11 +68,13 @@ void setup() {
   // Initialize LED controller
   ledController->begin();
   
-  // Create and initialize WiFi service
-  wifiService = new WiFiService(ledController, WIFI_SSID, WIFI_PASSWORD);
+  // Create and initialize WiFi service in AP mode
+  wifiService = new WiFiService(ledController, AP_SSID, AP_PASSWORD);
   wifiService->begin();
   
   Serial.println("Setup complete.");
+  Serial.println("Connect to WiFi network named '" AP_SSID "' with password '" AP_PASSWORD "'");
+  Serial.println("Then access the control panel at http://192.168.4.1/");
   
   // Print current time
   DateTime now = rtc.now();
@@ -95,7 +97,7 @@ void loop() {
   // Update LED controller
   ledController->update();
   
-  // Update WiFi service (in case of any periodic tasks)
+  // Update WiFi service (now with periodic AP status check)
   wifiService->update();
   
   // Short delay to prevent overwhelming the system
