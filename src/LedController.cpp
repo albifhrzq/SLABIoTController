@@ -66,10 +66,140 @@ void LedController::begin() {
   ledcSetup(channelWhite, freq, resolution);
   ledcAttachPin(pinWhite, channelWhite);
   
-  // Set default profiles
-  setDefaultProfiles();
+  // Initialize preferences
+  preferences.begin("led_ctrl", false);
+  
+  // Load saved profiles and settings from preferences
+  loadPreferences();
   
   Serial.println("LED Controller initialized");
+}
+
+// Save all profiles to preferences
+void LedController::saveProfilesToPreferences() {
+  // Save morning profile
+  String morningJson = profileToJson(morningProfile);
+  preferences.putString("profile_morning", morningJson);
+  
+  // Save midday profile
+  String middayJson = profileToJson(middayProfile);
+  preferences.putString("profile_midday", middayJson);
+  
+  // Save evening profile
+  String eveningJson = profileToJson(eveningProfile);
+  preferences.putString("profile_evening", eveningJson);
+  
+  // Save night profile
+  String nightJson = profileToJson(nightProfile);
+  preferences.putString("profile_night", nightJson);
+  
+  Serial.println("Profiles saved to preferences");
+}
+
+// Save time ranges to preferences
+void LedController::saveTimeRangesToPreferences() {
+  preferences.putInt("morning_start", morningStart);
+  preferences.putInt("midday_start", middayStart);
+  preferences.putInt("evening_start", eveningStart);
+  preferences.putInt("night_start", nightStart);
+  
+  Serial.println("Time ranges saved to preferences");
+}
+
+// Save mode to preferences
+void LedController::saveModeToPreferences() {
+  preferences.putBool("manual_mode", manualMode);
+  
+  Serial.println("Mode saved to preferences");
+}
+
+// Load all preferences
+void LedController::loadPreferences() {
+  // Check if profiles are saved
+  if (preferences.isKey("profile_morning")) {
+    String morningJson = preferences.getString("profile_morning", "");
+    if (morningJson.length() > 0) {
+      morningProfile = parseProfileJson(morningJson);
+      Serial.println("Loaded morning profile from preferences");
+    }
+  }
+  
+  if (preferences.isKey("profile_midday")) {
+    String middayJson = preferences.getString("profile_midday", "");
+    if (middayJson.length() > 0) {
+      middayProfile = parseProfileJson(middayJson);
+      Serial.println("Loaded midday profile from preferences");
+    }
+  }
+  
+  if (preferences.isKey("profile_evening")) {
+    String eveningJson = preferences.getString("profile_evening", "");
+    if (eveningJson.length() > 0) {
+      eveningProfile = parseProfileJson(eveningJson);
+      Serial.println("Loaded evening profile from preferences");
+    }
+  }
+  
+  if (preferences.isKey("profile_night")) {
+    String nightJson = preferences.getString("profile_night", "");
+    if (nightJson.length() > 0) {
+      nightProfile = parseProfileJson(nightJson);
+      Serial.println("Loaded night profile from preferences");
+    }
+  }
+  
+  // Load time ranges if saved
+  if (preferences.isKey("morning_start")) {
+    morningStart = preferences.getInt("morning_start", 7);
+    middayStart = preferences.getInt("midday_start", 10);
+    eveningStart = preferences.getInt("evening_start", 17);
+    nightStart = preferences.getInt("night_start", 21);
+    Serial.println("Loaded time ranges from preferences");
+  }
+  
+  // Load mode if saved
+  if (preferences.isKey("manual_mode")) {
+    manualMode = preferences.getBool("manual_mode", false);
+    Serial.println("Loaded mode from preferences: " + String(manualMode ? "manual" : "auto"));
+    
+    // Jika dalam mode manual, muat pengaturan LED manual
+    if (manualMode) {
+      // Muat pengaturan manual hanya jika key tersedia
+      if (preferences.isKey("manual_royal_blue")) {
+        uint8_t royalBlue = preferences.getUChar("manual_royal_blue", 0);
+        uint8_t blue = preferences.getUChar("manual_blue", 0);
+        uint8_t uv = preferences.getUChar("manual_uv", 0);
+        uint8_t violet = preferences.getUChar("manual_violet", 0);
+        uint8_t red = preferences.getUChar("manual_red", 0);
+        uint8_t green = preferences.getUChar("manual_green", 0);
+        uint8_t white = preferences.getUChar("manual_white", 0);
+        
+        // Terapkan pengaturan LED tanpa menyimpan lagi (hindari rekursi)
+        ledcWrite(channelRoyalBlue, royalBlue);
+        ledcWrite(channelBlue, blue);
+        ledcWrite(channelUV, uv);
+        ledcWrite(channelViolet, violet);
+        ledcWrite(channelRed, red);
+        ledcWrite(channelGreen, green);
+        ledcWrite(channelWhite, white);
+        
+        Serial.println("Loaded manual LED settings from preferences");
+      }
+    }
+  }
+  
+  // If no profiles were loaded from preferences, set defaults
+  if (!preferences.isKey("profile_morning")) {
+    setDefaultProfiles();
+    saveProfilesToPreferences();
+  }
+}
+
+// Save all preferences at once
+void LedController::saveAllPreferences() {
+  saveProfilesToPreferences();
+  saveTimeRangesToPreferences();
+  saveModeToPreferences();
 }
 
 void LedController::setDefaultProfiles() {
@@ -88,34 +218,42 @@ void LedController::setDefaultProfiles() {
 
 void LedController::setMorningProfile(LightProfile profile) {
   morningProfile = profile;
+  saveProfilesToPreferences();
 }
 
 void LedController::setMorningProfile(String jsonProfile) {
   morningProfile = parseProfileJson(jsonProfile);
+  saveProfilesToPreferences();
 }
 
 void LedController::setMiddayProfile(LightProfile profile) {
   middayProfile = profile;
+  saveProfilesToPreferences();
 }
 
 void LedController::setMiddayProfile(String jsonProfile) {
   middayProfile = parseProfileJson(jsonProfile);
+  saveProfilesToPreferences();
 }
 
 void LedController::setEveningProfile(LightProfile profile) {
   eveningProfile = profile;
+  saveProfilesToPreferences();
 }
 
 void LedController::setEveningProfile(String jsonProfile) {
   eveningProfile = parseProfileJson(jsonProfile);
+  saveProfilesToPreferences();
 }
 
 void LedController::setNightProfile(LightProfile profile) {
   nightProfile = profile;
+  saveProfilesToPreferences();
 }
 
 void LedController::setNightProfile(String jsonProfile) {
   nightProfile = parseProfileJson(jsonProfile);
+  saveProfilesToPreferences();
 }
 
 String LedController::getMorningProfileJson() {
@@ -184,6 +322,7 @@ void LedController::setTimeRanges(int morningStart, int middayStart, int evening
   this->middayStart = middayStart;
   this->eveningStart = eveningStart;
   this->nightStart = nightStart;
+  saveTimeRangesToPreferences();
 }
 
 String LedController::getTimeRangesJson() {
@@ -204,7 +343,7 @@ String LedController::getTimeRangesJson() {
 
 void LedController::setTimeRangesFromJson(String jsonTimeRanges) {
   // Parse JSON
-  StaticJsonDocument<100> doc;
+  StaticJsonDocument<200> doc;
   DeserializationError error = deserializeJson(doc, jsonTimeRanges);
   
   // Check for parsing errors
@@ -215,14 +354,65 @@ void LedController::setTimeRangesFromJson(String jsonTimeRanges) {
   }
   
   // Ekstrak nilai dengan pengecekan keberadaan key
-  if (doc.containsKey("morningStart")) morningStart = doc["morningStart"];
-  if (doc.containsKey("middayStart")) middayStart = doc["middayStart"];
-  if (doc.containsKey("eveningStart")) eveningStart = doc["eveningStart"];
-  if (doc.containsKey("nightStart")) nightStart = doc["nightStart"];
+  if (doc.containsKey("morningStart") && doc.containsKey("middayStart") && 
+      doc.containsKey("eveningStart") && doc.containsKey("nightStart")) {
+    
+    int newMorningStart = doc["morningStart"];
+    int newMiddayStart = doc["middayStart"];
+    int newEveningStart = doc["eveningStart"];
+    int newNightStart = doc["nightStart"];
+    
+    // Set new time ranges
+    setTimeRanges(newMorningStart, newMiddayStart, newEveningStart, newNightStart);
+  }
 }
 
 void LedController::enableManualMode(bool enable) {
+  // Jika mengubah dari auto ke manual, simpan pengaturan LED saat ini
+  if (!manualMode && enable) {
+    // Jika tidak ada pengaturan manual sebelumnya, gunakan pengaturan profil saat ini
+    if (!preferences.isKey("manual_royal_blue")) {
+      LightProfile currentProfile = getCurrentProfile();
+      
+      preferences.putUChar("manual_royal_blue", currentProfile.royalBlue);
+      preferences.putUChar("manual_blue", currentProfile.blue);
+      preferences.putUChar("manual_uv", currentProfile.uv);
+      preferences.putUChar("manual_violet", currentProfile.violet);
+      preferences.putUChar("manual_red", currentProfile.red);
+      preferences.putUChar("manual_green", currentProfile.green);
+      preferences.putUChar("manual_white", currentProfile.white);
+      
+      // Terapkan pengaturan LED saat ini untuk mode manual
+      ledcWrite(channelRoyalBlue, currentProfile.royalBlue);
+      ledcWrite(channelBlue, currentProfile.blue);
+      ledcWrite(channelUV, currentProfile.uv);
+      ledcWrite(channelViolet, currentProfile.violet);
+      ledcWrite(channelRed, currentProfile.red);
+      ledcWrite(channelGreen, currentProfile.green);
+      ledcWrite(channelWhite, currentProfile.white);
+    } else {
+      // Muat pengaturan manual sebelumnya
+      uint8_t royalBlue = preferences.getUChar("manual_royal_blue", 0);
+      uint8_t blue = preferences.getUChar("manual_blue", 0);
+      uint8_t uv = preferences.getUChar("manual_uv", 0);
+      uint8_t violet = preferences.getUChar("manual_violet", 0);
+      uint8_t red = preferences.getUChar("manual_red", 0);
+      uint8_t green = preferences.getUChar("manual_green", 0);
+      uint8_t white = preferences.getUChar("manual_white", 0);
+      
+      // Terapkan pengaturan LED
+      ledcWrite(channelRoyalBlue, royalBlue);
+      ledcWrite(channelBlue, blue);
+      ledcWrite(channelUV, uv);
+      ledcWrite(channelViolet, violet);
+      ledcWrite(channelRed, red);
+      ledcWrite(channelGreen, green);
+      ledcWrite(channelWhite, white);
+    }
+  }
+  
   manualMode = enable;
+  saveModeToPreferences();
 }
 
 bool LedController::isInManualMode() {
@@ -231,30 +421,58 @@ bool LedController::isInManualMode() {
 
 void LedController::setRoyalBlue(uint8_t intensity) {
   ledcWrite(channelRoyalBlue, intensity);
+  // Jika dalam mode manual, simpan pengaturan
+  if (manualMode) {
+    preferences.putUChar("manual_royal_blue", intensity);
+  }
 }
 
 void LedController::setBlue(uint8_t intensity) {
   ledcWrite(channelBlue, intensity);
+  // Jika dalam mode manual, simpan pengaturan
+  if (manualMode) {
+    preferences.putUChar("manual_blue", intensity);
+  }
 }
 
 void LedController::setUV(uint8_t intensity) {
   ledcWrite(channelUV, intensity);
+  // Jika dalam mode manual, simpan pengaturan
+  if (manualMode) {
+    preferences.putUChar("manual_uv", intensity);
+  }
 }
 
 void LedController::setViolet(uint8_t intensity) {
   ledcWrite(channelViolet, intensity);
+  // Jika dalam mode manual, simpan pengaturan
+  if (manualMode) {
+    preferences.putUChar("manual_violet", intensity);
+  }
 }
 
 void LedController::setRed(uint8_t intensity) {
   ledcWrite(channelRed, intensity);
+  // Jika dalam mode manual, simpan pengaturan
+  if (manualMode) {
+    preferences.putUChar("manual_red", intensity);
+  }
 }
 
 void LedController::setGreen(uint8_t intensity) {
   ledcWrite(channelGreen, intensity);
+  // Jika dalam mode manual, simpan pengaturan
+  if (manualMode) {
+    preferences.putUChar("manual_green", intensity);
+  }
 }
 
 void LedController::setWhite(uint8_t intensity) {
   ledcWrite(channelWhite, intensity);
+  // Jika dalam mode manual, simpan pengaturan
+  if (manualMode) {
+    preferences.putUChar("manual_white", intensity);
+  }
 }
 
 void LedController::update() {
@@ -322,6 +540,59 @@ String LedController::getCurrentTimeJson() {
   return output;
 }
 
+bool LedController::setCurrentTime(String timeJson) {
+  // Parse JSON time format
+  StaticJsonDocument<200> doc;
+  DeserializationError error = deserializeJson(doc, timeJson);
+  
+  // Check for parsing errors
+  if (error) {
+    Serial.print("JSON parsing failed: ");
+    Serial.println(error.c_str());
+    return false;
+  }
+  
+  // Extract time values with validation
+  if (!doc.containsKey("year") || !doc.containsKey("month") || !doc.containsKey("day") ||
+      !doc.containsKey("hour") || !doc.containsKey("minute") || !doc.containsKey("second")) {
+    Serial.println("JSON missing required time fields");
+    return false;
+  }
+  
+  int year = doc["year"].as<int>();
+  int month = doc["month"].as<int>();
+  int day = doc["day"].as<int>();
+  int hour = doc["hour"].as<int>();
+  int minute = doc["minute"].as<int>();
+  int second = doc["second"].as<int>();
+  
+  // Basic validation
+  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 ||
+      hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+    Serial.println("Invalid time values");
+    return false;
+  }
+  
+  // Set RTC time
+  DateTime newTime(year, month, day, hour, minute, second);
+  rtc->adjust(newTime);
+  
+  Serial.print("RTC time set to: ");
+  Serial.print(year);
+  Serial.print("-");
+  Serial.print(month);
+  Serial.print("-");
+  Serial.print(day);
+  Serial.print(" ");
+  Serial.print(hour);
+  Serial.print(":");
+  Serial.print(minute);
+  Serial.print(":");
+  Serial.println(second);
+  
+  return true;
+}
+
 LightProfile LedController::getCurrentProfile() {
   // Get current time from RTC
   DateTime now = rtc->now();
@@ -373,4 +644,10 @@ LightProfile LedController::interpolateProfiles(LightProfile profile1, LightProf
   result.white = profile1.white + (profile2.white - profile1.white) * ratio;
   
   return result;
+}
+
+// Destructor
+LedController::~LedController() {
+  // Free resources
+  preferences.end();
 } 

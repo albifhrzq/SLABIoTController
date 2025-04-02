@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <RTClib.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 
 // Light profile structure for different times of day
 struct LightProfile {
@@ -58,8 +59,17 @@ private:
   // Current operating mode
   bool manualMode;
   
+  // Preferences instance for persistent storage
+  Preferences preferences;
+  
   // Helper methods
   LightProfile interpolateProfiles(LightProfile profile1, LightProfile profile2, float ratio);
+  
+  // Save and load preferences
+  void saveProfilesToPreferences();
+  void saveTimeRangesToPreferences();
+  void saveModeToPreferences();
+  void loadPreferences();
   
 public:
   // Constructor
@@ -71,6 +81,9 @@ public:
     uint32_t freq, uint8_t resolution,
     RTC_DS3231* rtc
   );
+  
+  // Destructor
+  ~LedController();
   
   // Initialize LED controller
   void begin();
@@ -130,6 +143,12 @@ public:
   
   // Get current time from RTC as formatted string
   String getCurrentTimeJson();
+  
+  // Set current time on RTC
+  bool setCurrentTime(String timeJson);
+  
+  // Save all settings to persistent storage
+  void saveAllPreferences();
 };
 
 #endif // LED_CONTROLLER_H 
