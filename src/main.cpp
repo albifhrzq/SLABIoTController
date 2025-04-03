@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <RTClib.h>
 #include <ArduinoJson.h>
+#include <esp_wifi.h>  // Untuk akses low-level WiFi API
 #include "LedController.h"
 #include "WiFiService.h"
 
@@ -41,32 +42,59 @@ bool wifiInitialized = false;
 
 // Function to initialize WiFi with retry
 void initializeWiFi() {
+  int lastAttemptMillis = 0;
+  
   for (int attempt = 0; attempt < 3; attempt++) {
     Serial.print("WiFi initialization attempt ");
     Serial.print(attempt + 1);
     Serial.println("/3...");
     
+    // Hard reset WiFi drivers pada percobaan ke-2 atau ke-3
+    if (attempt > 0) {
+      Serial.println("Resetting WiFi hardware more aggressively...");
+      WiFi.disconnect(true);
+      WiFi.mode(WIFI_OFF);
+      delay(1000);
+      
+      // Gunakan esp_wifi_* API untuk reset hardware yang lebih menyeluruh
+      esp_wifi_stop();
+      delay(500);
+      esp_wifi_deinit();
+      delay(1000);
+      esp_wifi_init(NULL);
+      delay(500);
+      esp_wifi_start();
+      delay(1000);
+    }
+    
     // Create and initialize WiFi service in AP mode
     wifiService = new WiFiService(ledController, AP_SSID, AP_PASSWORD);
     wifiService->begin();
     
-    // Wait longer for AP to initialize properly
-    for (int i = 0; i < 5; i++) {
+    // Wait longer for AP to initialize properly (progressively longer)
+    int waitTime = (attempt + 1) * 2000; // 2s, 4s, 6s untuk tiap percobaan
+    Serial.print("Waiting for WiFi startup (");
+    Serial.print(waitTime / 1000);
+    Serial.println(" seconds)...");
+    
+    for (int i = 0; i < waitTime / 500; i++) {
       Serial.print(".");
       delay(500);
     }
     Serial.println();
     
-    // Reset WiFi hardware jika ini adalah percobaan kedua atau ketiga
-    if (attempt > 0) {
-      Serial.println("Resetting WiFi hardware...");
-      WiFi.disconnect(true);
-      WiFi.mode(WIFI_OFF);
-      delay(1000);
+    // Polling beberapa kali untuk memastikan status
+    int successCount = 0;
+    for (int check = 0; check < 5; check++) {
+      if (wifiService->isConnected()) {
+        successCount++;
+      }
+      // Jeda antara polling
+      delay(300);
     }
     
-    // Check if AP is running
-    if (wifiService->isConnected()) {
+    // Hanya anggap berhasil jika 3+ polling berhasil (melindungi dari false positive)
+    if (successCount >= 3) {
       wifiInitialized = true;
       Serial.println("WiFi initialized successfully");
       
@@ -78,13 +106,16 @@ void initializeWiFi() {
       Serial.println("Then access the control panel at http://" + ip.toString() + "/");
       break;
     } else {
-      Serial.println("WiFi initialization failed, retrying...");
+      Serial.print("WiFi initialization unstable (");
+      Serial.print(successCount);
+      Serial.println("/5 checks passed)");
       delete wifiService;
       wifiService = nullptr;
       
       // Wait longer before retry to give WiFi hardware waktu untuk reset sepenuhnya
       Serial.println("Waiting for WiFi hardware to reset...");
       delay(5000);
+      lastAttemptMillis = millis();
     }
   }
   
@@ -92,6 +123,9 @@ void initializeWiFi() {
     Serial.println("WARNING: WiFi initialization failed after multiple attempts!");
     Serial.println("LED controller will still function, but remote control won't be available.");
     Serial.println("Device will auto-restart in 1 hour to try again.");
+    
+    // Catat waktu percobaan terakhir di memori global
+    lastAttemptMillis = millis();
   }
 }
 

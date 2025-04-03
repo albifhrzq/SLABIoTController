@@ -1,4 +1,5 @@
 #include "WiFiService.h"
+#include "esp_wifi.h"  // Untuk akses fungsi WiFi ESP-IDF level rendah
 
 WiFiService::WiFiService(LedController* ledController, const char* ssid, const char* password) {
   this->ledController = ledController;
@@ -18,42 +19,107 @@ void WiFiService::begin() {
   // Start in Access Point mode directly
   Serial.println("Starting Access Point mode...");
   
-  // Start AP
-  startAP();
+  // Mulai AP dengan beberapa percobaan
+  bool apStartSuccess = false;
+  for (int attempt = 0; attempt < 3; attempt++) {
+    Serial.print("AP startup attempt ");
+    Serial.print(attempt + 1);
+    Serial.println("/3");
+    
+    // Start AP
+    startAP();
+    
+    // Tunggu AP siap
+    delay(1000);
+    
+    // Verifikasi AP aktif dan berjalan
+    if (apActive && WiFi.getMode() == WIFI_AP) {
+      apStartSuccess = true;
+      break;
+    }
+    
+    // Jika gagal, tunggu sedikit sebelum mencoba lagi
+    Serial.println("AP startup attempt failed, retrying...");
+    delay(2000);
+  }
+  
+  if (!apStartSuccess) {
+    Serial.println("WARNING: Failed to start AP after multiple attempts!");
+    Serial.println("Continuing with setup, will retry AP startup later.");
+  }
   
   // Setup endpoint API
   setupApiEndpoints();
   
-  // Start server
+  // Start server regardless of AP status
   server->begin();
-  Serial.println("HTTP server started in AP mode");
-  deviceConnected = true;
+  Serial.println("HTTP server started");
+  deviceConnected = false; // Start with no connections
 }
 
 void WiFiService::startAP() {
-  // Shutdown WiFi before reconfiguring
+  // Shutdown WiFi completely first
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
+  delay(1000); // Tunggu lebih lama (1 detik) untuk memastikan WiFi benar-benar mati
+  
+  // Force restart ESP32 WiFi drivers jika flag gagal sudah tinggi
+  if (reconnectAttempts >= 2) {
+    Serial.println("Performing WiFi driver reset...");
+    esp_wifi_stop();
+    delay(1000);
+    esp_wifi_deinit();
+    delay(1000);
+    esp_wifi_init(NULL);
+    delay(1000);
+    esp_wifi_start();
+    delay(1000);
+    reconnectAttempts = 0; // Reset counter setelah reset driver
+  }
+  
+  // Configure WiFi in AP mode explicitly
+  WiFi.mode(WIFI_OFF); // Pastikan mati dulu
   delay(500);
-  
-  // Configure WiFi in AP mode
   WiFi.mode(WIFI_AP);
+  delay(500); // Beri waktu untuk mengatur mode
   
-  // Konfigurasi IP statis untuk AP (opsional, tetapi memastikan konsistensi)
-  // Gunakan IP 192.168.4.1 (default untuk ESP32 AP)
+  // Set low-level parameters
+  WiFi.setTxPower(WIFI_POWER_19_5dBm); // Set TX power ke level maximum
+  
+  // Konfigurasi IP statis untuk AP 
   IPAddress local_IP(192, 168, 4, 1);
   IPAddress gateway(192, 168, 4, 1);
   IPAddress subnet(255, 255, 255, 0);
   
-  WiFi.softAPConfig(local_IP, gateway, subnet);
+  bool configSuccess = WiFi.softAPConfig(local_IP, gateway, subnet);
+  if (!configSuccess) {
+    Serial.println("AP IP configuration failed! Using default.");
+  } else {
+    Serial.println("AP IP configuration success.");
+  }
   
-  // Create access point with the SSID and password provided in the constructor
-  bool result = WiFi.softAP(ssid, password);
+  // Setup AP dengan parameter yang lebih eksplisit
+  // channel=1, ssid_hidden=0, max_connection=4, beacon_interval=100ms
+  bool result = WiFi.softAP(ssid, password, 1, 0, 4);
+  
+  // Tunggu AP benar-benar siap
+  delay(500);
   
   if (result) {
     apActive = true;
+    IPAddress myIP = WiFi.softAPIP();
     Serial.print("Access Point started. IP address: ");
-    Serial.println(WiFi.softAPIP());
+    Serial.println(myIP);
+    
+    // Verifikasi IP - restart jika bukan yang diharapkan
+    if (myIP != local_IP && configSuccess) {
+      Serial.println("Warning: IP address not as configured, will retry...");
+      WiFi.disconnect(true);
+      delay(500);
+      // Akan dicoba ulang di update berikutnya
+      apActive = false;
+      return;
+    }
     
     // Save status to preferences
     preferences.putBool("ap_active", true);
@@ -67,12 +133,45 @@ void WiFiService::startAP() {
 }
 
 void WiFiService::checkWiFiStatus() {
+  static unsigned long lastFullCheck = 0;
+  
   // Check if AP is active but no clients connected for a long time
   if (apActive) {
-    // Nothing to do here, just check if AP is still running
+    // Verifikasi mode WiFi benar
     if (WiFi.getMode() != WIFI_AP && WiFi.getMode() != WIFI_AP_STA) {
       Serial.println("AP mode unexpectedly disabled, restarting AP...");
       startAP();
+      return;
+    }
+    
+    // Verifikasi IP address benar
+    IPAddress expectedIP(192, 168, 4, 1);
+    if (WiFi.softAPIP() != expectedIP) {
+      Serial.println("AP IP address unexpected, reconfiguring...");
+      startAP();
+      return;
+    }
+    
+    // Full periodic check (setiap 5 menit)
+    if (millis() - lastFullCheck > 300000) {
+      lastFullCheck = millis();
+      
+      // Verifikasi SSID aktif - ini bisa jadi mahal, jadi hanya lakukan secara periodik
+      wifi_ap_record_t apInfo;
+      esp_wifi_sta_get_ap_info(&apInfo);
+      if (strlen((char*)apInfo.ssid) == 0) {
+        Serial.println("AP SSID not broadcasting properly, restarting WiFi...");
+        startAP();
+        return;
+      }
+      
+      Serial.println("Full WiFi health check passed");
+    }
+  } else {
+    // Jika AP seharusnya tidak aktif tapi ternyata mode-nya AP, ada masalah
+    if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+      Serial.println("WiFi in unexpected AP mode while flag disabled, fixing...");
+      apActive = true;
     }
   }
 }
@@ -442,10 +541,22 @@ void WiFiService::handleGetMode(AsyncWebServerRequest* request) {
 }
 
 bool WiFiService::isConnected() {
-  // Dalam mode AP, kita gunakan flag apActive dan periksa jika AP berjalan
+  // Dalam mode AP, kita cek kondisi AP lebih komprehensif
   if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
-    return apActive;
+    // Jika flag internal sudah menunjukkan AP tidak aktif, kembalikan false
+    if (!apActive) return false;
+    
+    // Check if AP is running on expected IP
+    IPAddress expectedIP(192, 168, 4, 1);
+    IPAddress currentIP = WiFi.softAPIP();
+    
+    // Check for valid IP (not 0.0.0.0)
+    bool validIP = (currentIP[0] != 0 || currentIP[1] != 0 || 
+                   currentIP[2] != 0 || currentIP[3] != 0);
+                   
+    return validIP;
   }
+  
   // Dalam mode STA, periksa status koneksi
   return WiFi.status() == WL_CONNECTED;
 }
@@ -464,9 +575,11 @@ void WiFiService::update() {
   static unsigned long lastAutoRestart = 0;
   static int failCount = 0;
   static unsigned long lastClientDisconnect = 0;
+  static unsigned long startupTime = millis(); // Catat waktu startup
   
-  // Quick WiFi health check every 10 seconds (lebih pelan dari 5 detik)
-  if (millis() - lastWiFiCheck > 10000) {
+  // Quick WiFi health check - lebih sering pada 5 menit pertama
+  unsigned long checkInterval = (millis() - startupTime < 300000) ? 5000 : 10000;
+  if (millis() - lastWiFiCheck > checkInterval) {
     lastWiFiCheck = millis();
     
     // Check if WiFi mode is correct
@@ -479,17 +592,22 @@ void WiFiService::update() {
       lastConnectAttempt = millis() - 25000; // Will trigger reconnect soon
       failCount++;
     }
+    
+    // Lebih agresif memulai AP pada 2 menit pertama jika belum active
+    if (!apActive && (millis() - startupTime < 120000)) {
+      Serial.println("WiFi not active during early startup, restarting AP...");
+      startAP();
+    }
   }
   
   // More detailed AP status check every 60 seconds (lebih pelan dari 30 detik)
-  if (millis() - lastAPCheck > 60000) {
+  // Tetapi lebih sering pada 3 menit pertama
+  unsigned long statusCheckInterval = (millis() - startupTime < 180000) ? 30000 : 60000;
+  if (millis() - lastAPCheck > statusCheckInterval) {
     lastAPCheck = millis();
     
-    // Check WiFi status thoroughly but gently
-    if (!apActive && WiFi.getMode() == WIFI_OFF) {
-      Serial.println("WiFi is OFF, restarting AP...");
-      startAP();
-    }
+    // Check WiFi status thoroughly
+    checkWiFiStatus();
     
     // Check if any clients are connected to the AP
     if (WiFi.softAPgetStationNum() > 0) {
@@ -558,7 +676,9 @@ void WiFiService::update() {
   }
   
   // Check if we need to attempt reconnection
-  if (!apActive && (millis() - lastConnectAttempt > 30000)) {
+  // Lebih agresif pada startup
+  unsigned long reconnectInterval = (millis() - startupTime < 300000) ? 10000 : 30000;
+  if (!apActive && (millis() - lastConnectAttempt > reconnectInterval)) {
     lastConnectAttempt = millis();
     Serial.println("Attempting to restart AP...");
     startAP();
