@@ -253,6 +253,15 @@ void WiFiService::setupApiEndpoints() {
     }
   );
   
+  // API untuk kontrol manual semua LED sekaligus
+  server->on("/api/manual/all", HTTP_POST,
+    [](AsyncWebServerRequest *request) {},
+    NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      this->handleManualControlAll(request, data, len);
+    }
+  );
+  
   // API untuk waktu saat ini
   server->on("/api/time", HTTP_GET, [this](AsyncWebServerRequest *request) {
     this->handleGetCurrentTime(request);
@@ -427,31 +436,49 @@ void WiFiService::handleSetTimeRanges(AsyncWebServerRequest* request, uint8_t* d
 void WiFiService::handleManualControl(AsyncWebServerRequest* request, uint8_t* data, size_t len) {
   String jsonString = String((char*)data);
   
+  Serial.print("Received manual control request: ");
+  Serial.println(jsonString);
+  
   // Parse JSON
-  StaticJsonDocument<200> doc;
+  StaticJsonDocument<256> doc;
   DeserializationError error = deserializeJson(doc, jsonString);
   
   // Check for parsing errors
   if (error) {
+    Serial.print("JSON parsing failed: ");
+    Serial.println(error.c_str());
     request->send(400, "text/plain", String("JSON parsing failed: ") + error.c_str());
     return;
   }
   
+  // Extract values with validation
   String led = "";
-  int intensity = 0;
+  int value = 0;
   
-  // Ekstrak nilai dengan pengecekan keberadaan key
+  // Get LED name
   if (doc.containsKey("led")) {
     led = doc["led"].as<String>();
+  } else {
+    Serial.println("Error: Missing 'led' property");
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing 'led' property\"}");
+    return;
   }
   
+  // Get value
   if (doc.containsKey("value")) {
-    intensity = doc["value"].as<int>();
+    value = doc["value"].as<int>();
+    
+    // Check for valid value range
+    if (value < 0 || value > 255) {
+      Serial.println("Error: Value out of range (0-255)");
+      request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Value out of range (0-255)\"}");
+      return;
+    }
+  } else {
+    Serial.println("Error: Missing 'value' property");
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing 'value' property\"}");
+    return;
   }
-  
-  // Batasi nilai intensitas
-  if (intensity < 0) intensity = 0;
-  if (intensity > 255) intensity = 255;
   
   // Pastikan dalam mode manual
   if (!ledController->isInManualMode()) {
@@ -460,19 +487,19 @@ void WiFiService::handleManualControl(AsyncWebServerRequest* request, uint8_t* d
   
   // Mengatur intensitas LED
   if (led == "royalBlue") {
-    ledController->setRoyalBlue(intensity);
+    ledController->setRoyalBlue(value);
   } else if (led == "blue") {
-    ledController->setBlue(intensity);
+    ledController->setBlue(value);
   } else if (led == "uv") {
-    ledController->setUV(intensity);
+    ledController->setUV(value);
   } else if (led == "violet") {
-    ledController->setViolet(intensity);
+    ledController->setViolet(value);
   } else if (led == "red") {
-    ledController->setRed(intensity);
+    ledController->setRed(value);
   } else if (led == "green") {
-    ledController->setGreen(intensity);
+    ledController->setGreen(value);
   } else if (led == "white") {
-    ledController->setWhite(intensity);
+    ledController->setWhite(value);
   } else {
     request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid LED type\"}");
     return;
@@ -629,7 +656,7 @@ void WiFiService::update() {
         // Hanya ubah status setelah 3 menit tidak ada koneksi (mencegah reconnect yang berlebihan)
         else if (millis() - lastClientDisconnect > 180000) {
           Serial.println("No clients connected to AP for 3 minutes");
-          deviceConnected = false;
+        deviceConnected = false;
           lastClientDisconnect = 0;
         }
       }
@@ -642,7 +669,7 @@ void WiFiService::update() {
       Serial.print(", IP: ");
       Serial.print(WiFi.softAPIP().toString());
       Serial.print(", ");
-      Serial.print(WiFi.softAPgetStationNum());
+    Serial.print(WiFi.softAPgetStationNum());
       Serial.print(" client(s) connected");
       if (lastClientDisconnect > 0) {
         Serial.print(", Reconnection grace: ");
@@ -705,6 +732,114 @@ void WiFiService::handlePing(AsyncWebServerRequest* request) {
   
   // Kirim respons
   request->send(200, "application/json", jsonResponse);
+}
+
+// Implementasi fungsi untuk mengontrol semua LED sekaligus
+void WiFiService::handleManualControlAll(AsyncWebServerRequest* request, uint8_t* data, size_t len) {
+  String jsonString = String((char*)data);
+  
+  Serial.print("Received manual control ALL request: ");
+  Serial.println(jsonString);
+  
+  // Validasi JSON sebelum memproses
+  StaticJsonDocument<512> doc;
+  DeserializationError error = deserializeJson(doc, jsonString);
+  
+  // Check for parsing errors
+  if (error) {
+    Serial.print("JSON parsing failed: ");
+    Serial.println(error.c_str());
+    String errorMsg = "{\"status\":\"error\",\"message\":\"JSON parsing failed: ";
+    errorMsg += error.c_str();
+    errorMsg += "\"}";
+    request->send(400, "application/json", errorMsg);
+    return;
+  }
+  
+  // Periksa apakah semua properti diperlukan ada
+  bool isValid = true;
+  String errorMessage = "Missing properties: ";
+  
+  if (!doc.containsKey("royalBlue")) {
+    errorMessage += "royalBlue, ";
+    isValid = false;
+  }
+  if (!doc.containsKey("blue")) {
+    errorMessage += "blue, ";
+    isValid = false;
+  }
+  if (!doc.containsKey("uv")) {
+    errorMessage += "uv, ";
+    isValid = false;
+  }
+  if (!doc.containsKey("violet")) {
+    errorMessage += "violet, ";
+    isValid = false;
+  }
+  if (!doc.containsKey("red")) {
+    errorMessage += "red, ";
+    isValid = false;
+  }
+  if (!doc.containsKey("green")) {
+    errorMessage += "green, ";
+    isValid = false;
+  }
+  if (!doc.containsKey("white")) {
+    errorMessage += "white, ";
+    isValid = false;
+  }
+  
+  // Jika ada properti yang hilang, kirim error
+  if (!isValid) {
+    Serial.println(errorMessage);
+    String jsonError = "{\"status\":\"error\",\"message\":\"" + errorMessage + "\"}";
+    request->send(400, "application/json", jsonError);
+    return;
+  }
+  
+  // Jika aplikasi mengirimkan data dengan format yang berbeda (misalnya dengan wrapper),
+  // coba periksa untuk wrapper umum
+  if (doc.containsKey("intensities") || doc.containsKey("values") || doc.containsKey("data") || doc.containsKey("leds")) {
+    Serial.println("Detected wrapper object, trying to extract LED values...");
+    JsonObject wrapper;
+    
+    if (doc.containsKey("intensities")) wrapper = doc["intensities"].as<JsonObject>();
+    else if (doc.containsKey("values")) wrapper = doc["values"].as<JsonObject>();
+    else if (doc.containsKey("data")) wrapper = doc["data"].as<JsonObject>();
+    else if (doc.containsKey("leds")) wrapper = doc["leds"].as<JsonObject>();
+    
+    // Re-create the correct JSON format expected by the controller
+    StaticJsonDocument<512> formattedDoc;
+    if (wrapper.containsKey("royalBlue")) formattedDoc["royalBlue"] = wrapper["royalBlue"];
+    if (wrapper.containsKey("blue")) formattedDoc["blue"] = wrapper["blue"];
+    if (wrapper.containsKey("uv")) formattedDoc["uv"] = wrapper["uv"];
+    if (wrapper.containsKey("violet")) formattedDoc["violet"] = wrapper["violet"];
+    if (wrapper.containsKey("red")) formattedDoc["red"] = wrapper["red"];
+    if (wrapper.containsKey("green")) formattedDoc["green"] = wrapper["green"];
+    if (wrapper.containsKey("white")) formattedDoc["white"] = wrapper["white"];
+    
+    // Serialize to string
+    String formattedJson;
+    serializeJson(formattedDoc, formattedJson);
+    
+    Serial.print("Reformatted JSON: ");
+    Serial.println(formattedJson);
+    
+    // Use the reformatted JSON
+    jsonString = formattedJson;
+  }
+  
+  // Pastikan mode manual aktif
+  if (!ledController->isInManualMode()) {
+    ledController->enableManualMode(true);
+    Serial.println("Switching to manual mode for controlling all LEDs");
+  }
+  
+  // Terapkan pengaturan LED dari JSON
+  ledController->setAllLedsFromJson(jsonString);
+  
+  // Kirim respons sukses
+  request->send(200, "application/json", "{\"status\":\"success\"}");
 }
 
 // Destructor untuk membersihkan sumber daya

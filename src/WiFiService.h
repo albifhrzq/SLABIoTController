@@ -38,6 +38,7 @@ private:
   void handleGetTimeRanges(AsyncWebServerRequest* request);
   void handleSetTimeRanges(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleManualControl(AsyncWebServerRequest* request, uint8_t* data, size_t len);
+  void handleManualControlAll(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleGetCurrentTime(AsyncWebServerRequest* request);
   void handleSetTime(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleSetMode(AsyncWebServerRequest* request, uint8_t* data, size_t len);

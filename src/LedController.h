@@ -127,6 +127,11 @@ public:
   void setGreen(uint8_t intensity);
   void setWhite(uint8_t intensity);
   
+  // Set all LED intensities at once
+  void setAllLeds(uint8_t royalBlue, uint8_t blue, uint8_t uv, uint8_t violet, 
+                  uint8_t red, uint8_t green, uint8_t white);
+  void setAllLedsFromJson(String jsonProfile);
+  
   // Update lighting based on current time (auto mode) or do nothing (manual mode)
   void update();
   

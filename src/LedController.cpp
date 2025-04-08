@@ -646,6 +646,53 @@ LightProfile LedController::interpolateProfiles(LightProfile profile1, LightProf
   return result;
 }
 
+void LedController::setAllLeds(uint8_t royalBlue, uint8_t blue, uint8_t uv, uint8_t violet, 
+                              uint8_t red, uint8_t green, uint8_t white) {
+  // Set semua LED sekaligus
+  setRoyalBlue(royalBlue);
+  setBlue(blue);
+  setUV(uv);
+  setViolet(violet);
+  setRed(red);
+  setGreen(green);
+  setWhite(white);
+  
+  // Log the values
+  Serial.println("Setting all LEDs to:");
+  Serial.print("Royal Blue: "); Serial.println(royalBlue);
+  Serial.print("Blue: "); Serial.println(blue);
+  Serial.print("UV: "); Serial.println(uv);
+  Serial.print("Violet: "); Serial.println(violet);
+  Serial.print("Red: "); Serial.println(red);
+  Serial.print("Green: "); Serial.println(green);
+  Serial.print("White: "); Serial.println(white);
+}
+
+void LedController::setAllLedsFromJson(String jsonProfile) {
+  // Parse JSON
+  StaticJsonDocument<512> doc;
+  DeserializationError error = deserializeJson(doc, jsonProfile);
+  
+  // Check for parsing errors
+  if (error) {
+    Serial.print("LedController JSON parsing failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+  
+  // Extract values with error checking and default values
+  uint8_t royalBlue = doc.containsKey("royalBlue") ? (uint8_t)doc["royalBlue"] : 0;
+  uint8_t blue = doc.containsKey("blue") ? (uint8_t)doc["blue"] : 0;
+  uint8_t uv = doc.containsKey("uv") ? (uint8_t)doc["uv"] : 0;
+  uint8_t violet = doc.containsKey("violet") ? (uint8_t)doc["violet"] : 0;
+  uint8_t red = doc.containsKey("red") ? (uint8_t)doc["red"] : 0;
+  uint8_t green = doc.containsKey("green") ? (uint8_t)doc["green"] : 0;
+  uint8_t white = doc.containsKey("white") ? (uint8_t)doc["white"] : 0;
+  
+  // Apply the values
+  setAllLeds(royalBlue, blue, uv, violet, red, green, white);
+}
+
 // Destructor
 LedController::~LedController() {
   // Free resources
