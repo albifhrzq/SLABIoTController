@@ -50,66 +50,84 @@ ESP32 SCL (GPIO22) -> SCL on RTC DS3231
 
 ## API Endpoints
 
-The server provides several RESTful API endpoints:
+### Profile Management
+- `GET /api/profile` - Get current lighting profile
+- `GET /api/profile?type={type}` - Get profile by type (morning, midday, evening, night)
+- `POST /api/profile` - Save lighting profile
 
-- `GET /api/profile?type=[morning|midday|evening|night]` - Get lighting profile by type
-- `POST /api/profile` - Set lighting profile (JSON format)
+### Time Management
+- `GET /api/time` - Get current time from RTC controller
+- `POST /api/time` - Synchronize time with controller
 - `GET /api/timeranges` - Get time ranges for each profile
-- `POST /api/timeranges` - Set time ranges (JSON format)
-- `POST /api/manual` - Control LEDs manually (JSON format)
-- `GET /api/time` - Get current time from RTC
+- `POST /api/timeranges` - Save time ranges for profiles
+
+### LED Control
+- `POST /api/manual` - Control individual LED
+  ```json
+  {
+    "led": "royalBlue",
+    "value": 150
+  }
+  ```
+- `POST /api/manual/all` - Control all LEDs simultaneously
+  ```json
+  {
+    "royalBlue": 150,
+    "blue": 200,
+    "uv": 50,
+    "violet": 100,
+    "red": 120,
+    "green": 180,
+    "white": 220
+  }
+  ```
+  Or with wrapper:
+  ```json
+  {
+    "leds": {
+      "royalBlue": 150,
+      "blue": 200,
+      "uv": 50,
+      "violet": 100,
+      "red": 120,
+      "green": 180,
+      "white": 220
+    }
+  }
+  ```
+
+### Mode Control
 - `GET /api/mode` - Get current operation mode (manual/auto)
-- `POST /api/mode` - Set operation mode (JSON format)
+- `POST /api/mode` - Change operation mode
+
+### Connection & Diagnostics
+- `GET /api/ping` - Check connection to controller
+- `GET /api/status` - Get system status
 
 ## API Request Examples
 
 ### Get Current Profile
 
-```
-GET /api/profile
-```
-
-### Set Profile
-
-```json
-POST /api/profile
-{
-  "type": "morning",
-  "profile": {
-    "royalBlue": 100,
-    "blue": 120,
-    "uv": 50,
-    "violet": 40,
-    "red": 200,
-    "green": 180,
-    "white": 150
-  }
-}
-```
-
-### Control LED Manually
-
-```json
-POST /api/manual
-{
-  "led": "royalBlue",
-  "value": 200
-}
-```
-
-### Change Operation Mode
-
-```json
-POST /api/mode
-{
-  "mode": "auto"
-}
-```
-
-## Flutter App Integration
-
-The Flutter application needs to be updated to use HTTP protocol instead of BLE. Use the `http` package to make API requests to the endpoints provided by the ESP32.
-
 ## License
 
-MIT
+MIT License
+
+Copyright (c) 2024 SLAB IoT Aquarium Controller
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
