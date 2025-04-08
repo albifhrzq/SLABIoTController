@@ -108,6 +108,18 @@ ESP32 SCL (GPIO22) -> SCL on RTC DS3231
 
 ### Get Current Profile
 
+## Flutter App Integration
+
+This controller can be controlled using the official Flutter application available at [SLAB App Repository](https://github.com/albifhrzq/slab-app). The app provides a user-friendly interface to manage all the controller's features including:
+
+- LED intensity control
+- Profile management
+- Time synchronization
+- Operation mode switching
+- Connection monitoring
+
+The app uses the HTTP protocol to communicate with the controller through the RESTful API endpoints described above.
+
 ## License
 
 MIT License
