@@ -58,6 +58,7 @@ private:
   
   // Current operating mode
   bool manualMode;
+  bool offMode; // New flag to track off mode
   
   // Preferences instance for persistent storage
   Preferences preferences;
@@ -154,6 +155,10 @@ public:
   
   // Save all settings to persistent storage
   void saveAllPreferences();
+  
+  // Off mode control
+  void setOffMode(bool off);
+  bool isInOffMode();
 };
 
 #endif // LED_CONTROLLER_H 

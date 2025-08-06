@@ -549,20 +549,36 @@ void WiFiService::handleSetMode(AsyncWebServerRequest* request, uint8_t* data, s
   }
   
   if (mode == "manual") {
+    ledController->setOffMode(false); // Disable off mode
     ledController->enableManualMode(true);
     Serial.println("Switched to manual mode");
     request->send(200, "application/json", "{\"status\":\"success\"}");
   } else if (mode == "auto") {
+    ledController->setOffMode(false); // Disable off mode
     ledController->enableManualMode(false);
     Serial.println("Switched to auto mode");
     request->send(200, "application/json", "{\"status\":\"success\"}");
+  } else if (mode == "off") {
+    // Turn off all LEDs and set off mode
+    ledController->setOffMode(true);
+    Serial.println("Switched to off mode - all LEDs turned off");
+    request->send(200, "application/json", "{\"status\":\"success\"}");
   } else {
-    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid mode\"}");
+    Serial.print("Invalid mode received: ");
+    Serial.println(mode);
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid mode. Valid modes: manual, auto, off\"}");
   }
 }
 
 void WiFiService::handleGetMode(AsyncWebServerRequest* request) {
-  String mode = ledController->isInManualMode() ? "manual" : "auto";
+  String mode;
+  if (ledController->isInOffMode()) {
+    mode = "off";
+  } else if (ledController->isInManualMode()) {
+    mode = "manual";
+  } else {
+    mode = "auto";
+  }
   String jsonResponse = "{\"mode\":\"" + mode + "\"}";
   request->send(200, "application/json", jsonResponse);
 }

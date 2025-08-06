@@ -41,6 +41,7 @@ LedController::LedController(
   
   // Default to auto mode
   this->manualMode = false;
+  this->offMode = false;
 }
 
 void LedController::begin() {
@@ -161,6 +162,12 @@ void LedController::loadPreferences() {
   if (preferences.isKey("manual_mode")) {
     manualMode = preferences.getBool("manual_mode", false);
     Serial.println("Loaded mode from preferences: " + String(manualMode ? "manual" : "auto"));
+    
+    // Load off mode if saved
+    if (preferences.isKey("off_mode")) {
+      offMode = preferences.getBool("off_mode", false);
+      Serial.println("Loaded off mode from preferences: " + String(offMode ? "ON" : "OFF"));
+    }
     
     // Jika dalam mode manual, muat pengaturan LED manual
     if (manualMode) {
@@ -691,6 +698,28 @@ void LedController::setAllLedsFromJson(String jsonProfile) {
   
   // Apply the values
   setAllLeds(royalBlue, blue, uv, violet, red, green, white);
+}
+
+// Off mode control methods
+void LedController::setOffMode(bool off) {
+  offMode = off;
+  if (off) {
+    // Turn off all LEDs
+    setAllLeds(0, 0, 0, 0, 0, 0, 0);
+    // Also set to manual mode to prevent auto lighting
+    manualMode = true;
+    Serial.println("OFF mode enabled - all LEDs turned off");
+  } else {
+    Serial.println("OFF mode disabled");
+  }
+  // Save state to preferences
+  preferences.begin("led_controller", false);
+  preferences.putBool("off_mode", offMode);
+  preferences.end();
+}
+
+bool LedController::isInOffMode() {
+  return offMode;
 }
 
 // Destructor
