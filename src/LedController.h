@@ -17,6 +17,12 @@ struct LightProfile {
   uint8_t white;
 };
 
+// Hourly schedule structure
+struct HourlyProfile {
+  uint8_t hour; // 0-23
+  LightProfile profile;
+};
+
 class LedController {
 private:
   // LED control pins
@@ -41,17 +47,8 @@ private:
   uint32_t freq;
   uint8_t resolution;
   
-  // Light profiles
-  LightProfile morningProfile;
-  LightProfile middayProfile;
-  LightProfile eveningProfile;
-  LightProfile nightProfile;
-  
-  // Time ranges
-  int morningStart;
-  int middayStart;
-  int eveningStart;
-  int nightStart;
+  // Hourly schedule
+  HourlyProfile hourlySchedule[24];
   
   // RTC instance reference
   RTC_DS3231* rtc;
@@ -67,8 +64,6 @@ private:
   LightProfile interpolateProfiles(LightProfile profile1, LightProfile profile2, float ratio);
   
   // Save and load preferences
-  void saveProfilesToPreferences();
-  void saveTimeRangesToPreferences();
   void saveModeToPreferences();
   void loadPreferences();
   
@@ -89,31 +84,9 @@ public:
   // Initialize LED controller
   void begin();
   
-  // Set default light profiles
-  void setDefaultProfiles();
-  
-  // Set custom profiles
-  void setMorningProfile(LightProfile profile);
-  void setMorningProfile(String jsonProfile);
-  void setMiddayProfile(LightProfile profile);
-  void setMiddayProfile(String jsonProfile);
-  void setEveningProfile(LightProfile profile);
-  void setEveningProfile(String jsonProfile);
-  void setNightProfile(LightProfile profile);
-  void setNightProfile(String jsonProfile);
-  
   // JSON methods for profiles
-  String getMorningProfileJson();
-  String getMiddayProfileJson();
-  String getEveningProfileJson();
-  String getNightProfileJson();
   LightProfile parseProfileJson(String jsonProfile);
   String profileToJson(LightProfile profile);
-  
-  // Set time ranges
-  void setTimeRanges(int morningStart, int middayStart, int eveningStart, int nightStart);
-  String getTimeRangesJson();
-  void setTimeRangesFromJson(String jsonTimeRanges);
   
   // Mode control
   void enableManualMode(bool enable);
@@ -159,6 +132,15 @@ public:
   // Off mode control
   void setOffMode(bool off);
   bool isInOffMode();
+  
+  // Hourly schedule control
+  void setHourlySchedule(String jsonSchedule);
+  String getHourlyScheduleJson();
+  void setHourlyProfile(uint8_t hour, LightProfile profile);
+  LightProfile getHourlyProfile(uint8_t hour);
+  void setDefaultHourlySchedule();
+  void saveHourlyScheduleToPreferences();
+  void loadHourlyScheduleFromPreferences();
 };
 
 #endif // LED_CONTROLLER_H 

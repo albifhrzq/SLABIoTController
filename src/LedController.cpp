@@ -33,15 +33,12 @@ LedController::LedController(
   // Store RTC reference
   this->rtc = rtc;
   
-  // Set default time ranges
-  this->morningStart = 7;
-  this->middayStart = 10;
-  this->eveningStart = 17;
-  this->nightStart = 21;
-  
   // Default to auto mode
   this->manualMode = false;
   this->offMode = false;
+  
+  // Initialize hourly schedule with default values
+  setDefaultHourlySchedule();
 }
 
 void LedController::begin() {
@@ -73,38 +70,10 @@ void LedController::begin() {
   // Load saved profiles and settings from preferences
   loadPreferences();
   
+  // Load hourly schedule from preferences
+  loadHourlyScheduleFromPreferences();
+  
   Serial.println("LED Controller initialized");
-}
-
-// Save all profiles to preferences
-void LedController::saveProfilesToPreferences() {
-  // Save morning profile
-  String morningJson = profileToJson(morningProfile);
-  preferences.putString("profile_morning", morningJson);
-  
-  // Save midday profile
-  String middayJson = profileToJson(middayProfile);
-  preferences.putString("profile_midday", middayJson);
-  
-  // Save evening profile
-  String eveningJson = profileToJson(eveningProfile);
-  preferences.putString("profile_evening", eveningJson);
-  
-  // Save night profile
-  String nightJson = profileToJson(nightProfile);
-  preferences.putString("profile_night", nightJson);
-  
-  Serial.println("Profiles saved to preferences");
-}
-
-// Save time ranges to preferences
-void LedController::saveTimeRangesToPreferences() {
-  preferences.putInt("morning_start", morningStart);
-  preferences.putInt("midday_start", middayStart);
-  preferences.putInt("evening_start", eveningStart);
-  preferences.putInt("night_start", nightStart);
-  
-  Serial.println("Time ranges saved to preferences");
 }
 
 // Save mode to preferences
@@ -116,48 +85,6 @@ void LedController::saveModeToPreferences() {
 
 // Load all preferences
 void LedController::loadPreferences() {
-  // Check if profiles are saved
-  if (preferences.isKey("profile_morning")) {
-    String morningJson = preferences.getString("profile_morning", "");
-    if (morningJson.length() > 0) {
-      morningProfile = parseProfileJson(morningJson);
-      Serial.println("Loaded morning profile from preferences");
-    }
-  }
-  
-  if (preferences.isKey("profile_midday")) {
-    String middayJson = preferences.getString("profile_midday", "");
-    if (middayJson.length() > 0) {
-      middayProfile = parseProfileJson(middayJson);
-      Serial.println("Loaded midday profile from preferences");
-    }
-  }
-  
-  if (preferences.isKey("profile_evening")) {
-    String eveningJson = preferences.getString("profile_evening", "");
-    if (eveningJson.length() > 0) {
-      eveningProfile = parseProfileJson(eveningJson);
-      Serial.println("Loaded evening profile from preferences");
-    }
-  }
-  
-  if (preferences.isKey("profile_night")) {
-    String nightJson = preferences.getString("profile_night", "");
-    if (nightJson.length() > 0) {
-      nightProfile = parseProfileJson(nightJson);
-      Serial.println("Loaded night profile from preferences");
-    }
-  }
-  
-  // Load time ranges if saved
-  if (preferences.isKey("morning_start")) {
-    morningStart = preferences.getInt("morning_start", 7);
-    middayStart = preferences.getInt("midday_start", 10);
-    eveningStart = preferences.getInt("evening_start", 17);
-    nightStart = preferences.getInt("night_start", 21);
-    Serial.println("Loaded time ranges from preferences");
-  }
-  
   // Load mode if saved
   if (preferences.isKey("manual_mode")) {
     manualMode = preferences.getBool("manual_mode", false);
@@ -194,89 +121,12 @@ void LedController::loadPreferences() {
       }
     }
   }
-  
-  // If no profiles were loaded from preferences, set defaults
-  if (!preferences.isKey("profile_morning")) {
-    setDefaultProfiles();
-    saveProfilesToPreferences();
-  }
 }
 
 // Save all preferences at once
 void LedController::saveAllPreferences() {
-  saveProfilesToPreferences();
-  saveTimeRangesToPreferences();
+  saveHourlyScheduleToPreferences();
   saveModeToPreferences();
-}
-
-void LedController::setDefaultProfiles() {
-  // Morning profile (soft morning light)
-  morningProfile = {100, 150, 50, 50, 150, 100, 200};
-  
-  // Midday profile (bright midday light)
-  middayProfile = {200, 255, 150, 100, 100, 200, 255};
-  
-  // Evening profile (warmer evening light)
-  eveningProfile = {100, 150, 200, 150, 200, 50, 100};
-  
-  // Night profile (dim blue-heavy night light)
-  nightProfile = {20, 50, 30, 20, 10, 10, 0};
-}
-
-void LedController::setMorningProfile(LightProfile profile) {
-  morningProfile = profile;
-  saveProfilesToPreferences();
-}
-
-void LedController::setMorningProfile(String jsonProfile) {
-  morningProfile = parseProfileJson(jsonProfile);
-  saveProfilesToPreferences();
-}
-
-void LedController::setMiddayProfile(LightProfile profile) {
-  middayProfile = profile;
-  saveProfilesToPreferences();
-}
-
-void LedController::setMiddayProfile(String jsonProfile) {
-  middayProfile = parseProfileJson(jsonProfile);
-  saveProfilesToPreferences();
-}
-
-void LedController::setEveningProfile(LightProfile profile) {
-  eveningProfile = profile;
-  saveProfilesToPreferences();
-}
-
-void LedController::setEveningProfile(String jsonProfile) {
-  eveningProfile = parseProfileJson(jsonProfile);
-  saveProfilesToPreferences();
-}
-
-void LedController::setNightProfile(LightProfile profile) {
-  nightProfile = profile;
-  saveProfilesToPreferences();
-}
-
-void LedController::setNightProfile(String jsonProfile) {
-  nightProfile = parseProfileJson(jsonProfile);
-  saveProfilesToPreferences();
-}
-
-String LedController::getMorningProfileJson() {
-  return profileToJson(morningProfile);
-}
-
-String LedController::getMiddayProfileJson() {
-  return profileToJson(middayProfile);
-}
-
-String LedController::getEveningProfileJson() {
-  return profileToJson(eveningProfile);
-}
-
-String LedController::getNightProfileJson() {
-  return profileToJson(nightProfile);
 }
 
 String LedController::profileToJson(LightProfile profile) {
@@ -322,56 +172,6 @@ LightProfile LedController::parseProfileJson(String jsonProfile) {
   profile.white = doc.containsKey("white") ? (uint8_t)doc["white"] : 0;
   
   return profile;
-}
-
-void LedController::setTimeRanges(int morningStart, int middayStart, int eveningStart, int nightStart) {
-  this->morningStart = morningStart;
-  this->middayStart = middayStart;
-  this->eveningStart = eveningStart;
-  this->nightStart = nightStart;
-  saveTimeRangesToPreferences();
-}
-
-String LedController::getTimeRangesJson() {
-  // Alokasi memori untuk JSON document
-  StaticJsonDocument<100> doc;
-  
-  // Isi dengan data waktu
-  doc["morningStart"] = morningStart;
-  doc["middayStart"] = middayStart;
-  doc["eveningStart"] = eveningStart;
-  doc["nightStart"] = nightStart;
-  
-  // Serialize JSON ke string
-  String output;
-  serializeJson(doc, output);
-  return output;
-}
-
-void LedController::setTimeRangesFromJson(String jsonTimeRanges) {
-  // Parse JSON
-  StaticJsonDocument<200> doc;
-  DeserializationError error = deserializeJson(doc, jsonTimeRanges);
-  
-  // Check for parsing errors
-  if (error) {
-    Serial.print("JSON parsing failed: ");
-    Serial.println(error.c_str());
-    return;
-  }
-  
-  // Ekstrak nilai dengan pengecekan keberadaan key
-  if (doc.containsKey("morningStart") && doc.containsKey("middayStart") && 
-      doc.containsKey("eveningStart") && doc.containsKey("nightStart")) {
-    
-    int newMorningStart = doc["morningStart"];
-    int newMiddayStart = doc["middayStart"];
-    int newEveningStart = doc["eveningStart"];
-    int newNightStart = doc["nightStart"];
-    
-    // Set new time ranges
-    setTimeRanges(newMorningStart, newMiddayStart, newEveningStart, newNightStart);
-  }
 }
 
 void LedController::enableManualMode(bool enable) {
@@ -483,6 +283,11 @@ void LedController::setWhite(uint8_t intensity) {
 }
 
 void LedController::update() {
+  // In off mode, don't update anything
+  if (offMode) {
+    return;
+  }
+  
   // In manual mode, we don't update based on time
   if (manualMode) {
     return;
@@ -606,32 +411,17 @@ LightProfile LedController::getCurrentProfile() {
   
   int hour = now.hour();
   int minute = now.minute();
-  float hourFloat = hour + minute / 60.0;
   
-  // Determine which profiles to interpolate between
-  LightProfile profile1, profile2;
-  float ratio;
+  // Get the profile for the current hour
+  LightProfile currentHourProfile = hourlySchedule[hour].profile;
   
-  if (hourFloat >= nightStart || hourFloat < morningStart) {
-    // Night profile
-    return nightProfile;
-  } else if (hourFloat >= morningStart && hourFloat < middayStart) {
-    // Morning transition
-    profile1 = morningProfile;
-    profile2 = middayProfile;
-    ratio = (hourFloat - morningStart) / (middayStart - morningStart);
-  } else if (hourFloat >= middayStart && hourFloat < eveningStart) {
-    // Midday profile
-    return middayProfile;
-  } else if (hourFloat >= eveningStart && hourFloat < nightStart) {
-    // Evening transition
-    profile1 = eveningProfile;
-    profile2 = nightProfile;
-    ratio = (hourFloat - eveningStart) / (nightStart - eveningStart);
-  }
+  // Get the profile for the next hour (with wrap-around)
+  int nextHour = (hour + 1) % 24;
+  LightProfile nextHourProfile = hourlySchedule[nextHour].profile;
   
-  // Interpolate between profiles
-  return interpolateProfiles(profile1, profile2, ratio);
+  // Interpolate between current and next hour based on minutes
+  float ratio = minute / 60.0;
+  return interpolateProfiles(currentHourProfile, nextHourProfile, ratio);
 }
 
 LightProfile LedController::interpolateProfiles(LightProfile profile1, LightProfile profile2, float ratio) {
@@ -726,4 +516,207 @@ bool LedController::isInOffMode() {
 LedController::~LedController() {
   // Free resources
   preferences.end();
-} 
+}
+
+// ========== HOURLY SCHEDULE FUNCTIONS ==========
+
+void LedController::setDefaultHourlySchedule() {
+  // Set default hourly profiles
+  // Night hours (0-6): Dim blue light
+  for (int i = 0; i <= 6; i++) {
+    hourlySchedule[i].hour = i;
+    hourlySchedule[i].profile = {20, 50, 30, 20, 10, 10, 0};
+  }
+  
+  // Morning ramp-up (7-9): Gradually increase intensity
+  hourlySchedule[7].hour = 7;
+  hourlySchedule[7].profile = {80, 120, 40, 40, 100, 80, 150};
+  
+  hourlySchedule[8].hour = 8;
+  hourlySchedule[8].profile = {120, 160, 60, 60, 120, 120, 180};
+  
+  hourlySchedule[9].hour = 9;
+  hourlySchedule[9].profile = {160, 200, 100, 80, 100, 160, 220};
+  
+  // Peak daylight (10-16): Bright full spectrum
+  for (int i = 10; i <= 16; i++) {
+    hourlySchedule[i].hour = i;
+    hourlySchedule[i].profile = {200, 255, 150, 100, 100, 200, 255};
+  }
+  
+  // Evening ramp-down (17-19): Warmer tones
+  hourlySchedule[17].hour = 17;
+  hourlySchedule[17].profile = {120, 180, 180, 140, 180, 80, 140};
+  
+  hourlySchedule[18].hour = 18;
+  hourlySchedule[18].profile = {100, 150, 200, 150, 200, 50, 100};
+  
+  hourlySchedule[19].hour = 19;
+  hourlySchedule[19].profile = {60, 100, 120, 100, 120, 30, 50};
+  
+  // Late evening (20): Transition to night
+  hourlySchedule[20].hour = 20;
+  hourlySchedule[20].profile = {40, 80, 80, 60, 60, 20, 20};
+  
+  // Night hours (21-23): Dim blue light
+  for (int i = 21; i <= 23; i++) {
+    hourlySchedule[i].hour = i;
+    hourlySchedule[i].profile = {20, 50, 30, 20, 10, 10, 0};
+  }
+  
+  Serial.println("Default hourly schedule set");
+}
+
+void LedController::setHourlyProfile(uint8_t hour, LightProfile profile) {
+  if (hour > 23) {
+    Serial.println("Invalid hour value (must be 0-23)");
+    return;
+  }
+  
+  hourlySchedule[hour].hour = hour;
+  hourlySchedule[hour].profile = profile;
+  
+  Serial.print("Hourly profile for hour ");
+  Serial.print(hour);
+  Serial.println(" updated");
+}
+
+LightProfile LedController::getHourlyProfile(uint8_t hour) {
+  if (hour > 23) {
+    Serial.println("Invalid hour value (must be 0-23)");
+    return {0, 0, 0, 0, 0, 0, 0};
+  }
+  
+  return hourlySchedule[hour].profile;
+}
+
+void LedController::setHourlySchedule(String jsonSchedule) {
+  // Parse JSON array
+  StaticJsonDocument<4096> doc; // Larger buffer for 24-hour schedule
+  DeserializationError error = deserializeJson(doc, jsonSchedule);
+  
+  if (error) {
+    Serial.print("JSON parsing failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+  
+  // Check if the root is an array
+  if (!doc.is<JsonArray>()) {
+    // Maybe it's wrapped in an object with "schedule" key
+    if (doc.containsKey("schedule")) {
+      JsonArray scheduleArray = doc["schedule"].as<JsonArray>();
+      
+      for (JsonObject hourObj : scheduleArray) {
+        if (hourObj.containsKey("hour")) {
+          uint8_t hour = hourObj["hour"];
+          
+          if (hour <= 23) {
+            LightProfile profile;
+            profile.royalBlue = hourObj.containsKey("royalBlue") ? (uint8_t)hourObj["royalBlue"] : 0;
+            profile.blue = hourObj.containsKey("blue") ? (uint8_t)hourObj["blue"] : 0;
+            profile.uv = hourObj.containsKey("uv") ? (uint8_t)hourObj["uv"] : 0;
+            profile.violet = hourObj.containsKey("violet") ? (uint8_t)hourObj["violet"] : 0;
+            profile.red = hourObj.containsKey("red") ? (uint8_t)hourObj["red"] : 0;
+            profile.green = hourObj.containsKey("green") ? (uint8_t)hourObj["green"] : 0;
+            profile.white = hourObj.containsKey("white") ? (uint8_t)hourObj["white"] : 0;
+            
+            setHourlyProfile(hour, profile);
+          }
+        }
+      }
+    } else {
+      Serial.println("Invalid JSON format for hourly schedule");
+      return;
+    }
+  } else {
+    // Process as direct array
+    JsonArray scheduleArray = doc.as<JsonArray>();
+    
+    for (JsonObject hourObj : scheduleArray) {
+      if (hourObj.containsKey("hour")) {
+        uint8_t hour = hourObj["hour"];
+        
+        if (hour <= 23) {
+          LightProfile profile;
+          profile.royalBlue = hourObj.containsKey("royalBlue") ? (uint8_t)hourObj["royalBlue"] : 0;
+          profile.blue = hourObj.containsKey("blue") ? (uint8_t)hourObj["blue"] : 0;
+          profile.uv = hourObj.containsKey("uv") ? (uint8_t)hourObj["uv"] : 0;
+          profile.violet = hourObj.containsKey("violet") ? (uint8_t)hourObj["violet"] : 0;
+          profile.red = hourObj.containsKey("red") ? (uint8_t)hourObj["red"] : 0;
+          profile.green = hourObj.containsKey("green") ? (uint8_t)hourObj["green"] : 0;
+          profile.white = hourObj.containsKey("white") ? (uint8_t)hourObj["white"] : 0;
+          
+          setHourlyProfile(hour, profile);
+        }
+      }
+    }
+  }
+  
+  // Save to preferences
+  saveHourlyScheduleToPreferences();
+  
+  Serial.println("Hourly schedule updated from JSON");
+}
+
+String LedController::getHourlyScheduleJson() {
+  // Create JSON document with larger buffer
+  DynamicJsonDocument doc(4096);
+  JsonArray scheduleArray = doc.createNestedArray("schedule");
+  
+  for (int i = 0; i < 24; i++) {
+    JsonObject hourObj = scheduleArray.createNestedObject();
+    hourObj["hour"] = hourlySchedule[i].hour;
+    hourObj["royalBlue"] = hourlySchedule[i].profile.royalBlue;
+    hourObj["blue"] = hourlySchedule[i].profile.blue;
+    hourObj["uv"] = hourlySchedule[i].profile.uv;
+    hourObj["violet"] = hourlySchedule[i].profile.violet;
+    hourObj["red"] = hourlySchedule[i].profile.red;
+    hourObj["green"] = hourlySchedule[i].profile.green;
+    hourObj["white"] = hourlySchedule[i].profile.white;
+  }
+  
+  String output;
+  serializeJson(doc, output);
+  return output;
+}
+
+void LedController::saveHourlyScheduleToPreferences() {
+  preferences.begin("led_ctrl", false);
+  
+  // Save each hour's profile
+  for (int i = 0; i < 24; i++) {
+    String key = "h" + String(i);
+    String profileJson = profileToJson(hourlySchedule[i].profile);
+    preferences.putString(key.c_str(), profileJson);
+  }
+  
+  preferences.end();
+  Serial.println("Hourly schedule saved to preferences");
+}
+
+void LedController::loadHourlyScheduleFromPreferences() {
+  preferences.begin("led_ctrl", false);
+  
+  // Load each hour's profile
+  bool foundSchedule = false;
+  for (int i = 0; i < 24; i++) {
+    String key = "h" + String(i);
+    if (preferences.isKey(key.c_str())) {
+      String profileJson = preferences.getString(key.c_str(), "");
+      if (profileJson.length() > 0) {
+        hourlySchedule[i].hour = i;
+        hourlySchedule[i].profile = parseProfileJson(profileJson);
+        foundSchedule = true;
+      }
+    }
+  }
+  
+  if (foundSchedule) {
+    Serial.println("Loaded hourly schedule from preferences");
+  } else {
+    Serial.println("No saved hourly schedule found, using defaults");
+  }
+  
+  preferences.end();
+}

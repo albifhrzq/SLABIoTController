@@ -33,10 +33,6 @@ private:
   void handleNotFound(AsyncWebServerRequest* request);
   
   // API handlers
-  void handleGetProfile(AsyncWebServerRequest* request);
-  void handleSetProfile(AsyncWebServerRequest* request, uint8_t* data, size_t len);
-  void handleGetTimeRanges(AsyncWebServerRequest* request);
-  void handleSetTimeRanges(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleManualControl(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleManualControlAll(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleGetCurrentTime(AsyncWebServerRequest* request);
@@ -44,6 +40,11 @@ private:
   void handleSetMode(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleGetMode(AsyncWebServerRequest* request);
   void handlePing(AsyncWebServerRequest* request);
+  
+  // Hourly schedule handlers
+  void handleGetHourlySchedule(AsyncWebServerRequest* request);
+  void handleSetHourlySchedule(AsyncWebServerRequest* request, uint8_t* data, size_t len);
+  void handleGetHourProfile(AsyncWebServerRequest* request);
   
   // Helper methods untuk WiFi
   void startAP();
