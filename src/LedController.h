@@ -138,7 +138,6 @@ public:
   String getHourlyScheduleJson();
   void setHourlyProfile(uint8_t hour, LightProfile profile);
   LightProfile getHourlyProfile(uint8_t hour);
-  void setDefaultHourlySchedule();
   void saveHourlyScheduleToPreferences();
   void loadHourlyScheduleFromPreferences();
 };

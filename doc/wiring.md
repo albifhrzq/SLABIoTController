@@ -25,7 +25,7 @@ Gunakan driver LED PWM yang sesuai untuk mengontrol LED. Driver LED harus mampu 
 | GPIO14 | Channel 4 (Violet) |
 | GPIO12 | Channel 5 (Red) |
 | GPIO13 | Channel 6 (Green) |
-| GPIO15 | Channel 7 (White) |
+| GPIO23 | Channel 7 (White) |
 | GND   | GND        |
 
 ### Catatan Tambahan
@@ -73,7 +73,7 @@ ESP32                LED DRIVER           LED STRIPS
 │ GPIO14 ├───────────┤ CH4     ├──────────┤ VIOLET  │
 │ GPIO12 ├───────────┤ CH5     ├──────────┤ RED     │
 │ GPIO13 ├───────────┤ CH6     ├──────────┤ GREEN   │
-│ GPIO15 ├───────────┤ CH7     ├──────────┤ WHITE   │
+│ GPIO23 ├───────────┤ CH7     ├──────────┤ WHITE   │
 │    GND ├───────────┤ GND     │          │         │
 │        │           │         │          │         │
 └────────┘           └─────────┘          └─────────┘

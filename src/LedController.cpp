@@ -37,8 +37,11 @@ LedController::LedController(
   this->manualMode = false;
   this->offMode = false;
   
-  // Initialize hourly schedule with default values
-  setDefaultHourlySchedule();
+  // Initialize hourly schedule with all zeros (user must configure)
+  for (int i = 0; i < 24; i++) {
+    hourlySchedule[i].hour = i;
+    hourlySchedule[i].profile = {0, 0, 0, 0, 0, 0, 0};
+  }
 }
 
 void LedController::begin() {
@@ -519,53 +522,6 @@ LedController::~LedController() {
 }
 
 // ========== HOURLY SCHEDULE FUNCTIONS ==========
-
-void LedController::setDefaultHourlySchedule() {
-  // Set default hourly profiles
-  // Night hours (0-6): Dim blue light
-  for (int i = 0; i <= 6; i++) {
-    hourlySchedule[i].hour = i;
-    hourlySchedule[i].profile = {20, 50, 30, 20, 10, 10, 0};
-  }
-  
-  // Morning ramp-up (7-9): Gradually increase intensity
-  hourlySchedule[7].hour = 7;
-  hourlySchedule[7].profile = {80, 120, 40, 40, 100, 80, 150};
-  
-  hourlySchedule[8].hour = 8;
-  hourlySchedule[8].profile = {120, 160, 60, 60, 120, 120, 180};
-  
-  hourlySchedule[9].hour = 9;
-  hourlySchedule[9].profile = {160, 200, 100, 80, 100, 160, 220};
-  
-  // Peak daylight (10-16): Bright full spectrum
-  for (int i = 10; i <= 16; i++) {
-    hourlySchedule[i].hour = i;
-    hourlySchedule[i].profile = {200, 255, 150, 100, 100, 200, 255};
-  }
-  
-  // Evening ramp-down (17-19): Warmer tones
-  hourlySchedule[17].hour = 17;
-  hourlySchedule[17].profile = {120, 180, 180, 140, 180, 80, 140};
-  
-  hourlySchedule[18].hour = 18;
-  hourlySchedule[18].profile = {100, 150, 200, 150, 200, 50, 100};
-  
-  hourlySchedule[19].hour = 19;
-  hourlySchedule[19].profile = {60, 100, 120, 100, 120, 30, 50};
-  
-  // Late evening (20): Transition to night
-  hourlySchedule[20].hour = 20;
-  hourlySchedule[20].profile = {40, 80, 80, 60, 60, 20, 20};
-  
-  // Night hours (21-23): Dim blue light
-  for (int i = 21; i <= 23; i++) {
-    hourlySchedule[i].hour = i;
-    hourlySchedule[i].profile = {20, 50, 30, 20, 10, 10, 0};
-  }
-  
-  Serial.println("Default hourly schedule set");
-}
 
 void LedController::setHourlyProfile(uint8_t hour, LightProfile profile) {
   if (hour > 23) {
