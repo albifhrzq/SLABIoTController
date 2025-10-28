@@ -45,6 +45,7 @@ private:
   void handleGetHourlySchedule(AsyncWebServerRequest* request);
   void handleSetHourlySchedule(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   void handleGetHourProfile(AsyncWebServerRequest* request);
+  void handleSetHourProfile(AsyncWebServerRequest* request, uint8_t* data, size_t len);
   
   // Helper methods untuk WiFi
   void startAP();

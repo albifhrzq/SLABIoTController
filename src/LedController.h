@@ -63,6 +63,9 @@ private:
   // Helper methods
   LightProfile interpolateProfiles(LightProfile profile1, LightProfile profile2, float ratio);
   
+  // Ensure all manual LED channels are initialized in NVS
+  void ensureAllManualChannelsSaved();
+  
   // Save and load preferences
   void saveModeToPreferences();
   void loadPreferences();

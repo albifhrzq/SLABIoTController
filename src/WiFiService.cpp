@@ -205,6 +205,27 @@ void WiFiService::setupApiEndpoints() {
   
   // Handle OPTIONS method untuk CORS
   server->onNotFound([this](AsyncWebServerRequest *request) {
+    String url = request->url();
+    
+    // Manual routing for /api/schedule/hourly/{hour}
+    if (url.startsWith("/api/schedule/hourly/")) {
+      String hourStr = url.substring(22); // Get everything after "/api/schedule/hourly/"
+      int hour = hourStr.toInt();
+      
+      if (hour >= 0 && hour <= 23) {
+        if (request->method() == HTTP_GET) {
+          this->handleGetHourProfile(request);
+          return;
+        } else if (request->method() == HTTP_POST) {
+          // For POST with body, we need to handle it differently
+          Serial.println("Received POST to per-hour endpoint via onNotFound");
+          request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"POST body handler not available in onNotFound. Use delegated handler.\"}");
+          return;
+        }
+      }
+    }
+    
+    // Default not found handler
     this->handleNotFound(request);
   });
   
@@ -270,24 +291,111 @@ void WiFiService::setupApiEndpoints() {
   
   // ========== NEW HOURLY SCHEDULE API ENDPOINTS ==========
   
-  // Get hourly schedule
+  // IMPORTANT: AsyncWebServer may not properly handle regex patterns with parameters
+  // So we use a single endpoint and do manual URL parsing inside the handler
+  
+  // Get/Set hourly schedule (handles both /api/schedule/hourly and /api/schedule/hourly/17)
   server->on("/api/schedule/hourly", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    this->handleGetHourlySchedule(request);
+    // Check if URL has hour parameter
+    String url = request->url();
+    if (url.length() > 22 && url.indexOf("/api/schedule/hourly/") >= 0) {
+      this->handleGetHourProfile(request);
+    } else {
+      this->handleGetHourlySchedule(request);
+    }
   });
   
-  // Set hourly schedule
   server->on("/api/schedule/hourly", HTTP_POST,
     [](AsyncWebServerRequest *request) {},
     NULL,
     [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      // CRITICAL FIX: Check if this is a per-hour request FIRST
+      String url = request->url();
+      
+      Serial.println("========================================");
+      Serial.print("POST request received to URL: '");
+      Serial.print(url);
+      Serial.println("'");
+      Serial.print("URL length: ");
+      Serial.println(url.length());
+      
+      // Find the position of "/api/schedule/hourly/"
+      int basePos = url.indexOf("/api/schedule/hourly/");
+      
+      if (basePos >= 0) {
+        Serial.println(">>> Found '/api/schedule/hourly/' in URL");
+        
+        // Extract everything after "/api/schedule/hourly/"
+        // The base string "/api/schedule/hourly/" is 21 characters
+        String hourStr = url.substring(basePos + 21);
+        
+        // Remove query parameters if any
+        int queryPos = hourStr.indexOf('?');
+        if (queryPos > 0) {
+          hourStr = hourStr.substring(0, queryPos);
+        }
+        
+        // Remove trailing slash if present
+        if (hourStr.endsWith("/")) {
+          hourStr = hourStr.substring(0, hourStr.length() - 1);
+        }
+        
+        hourStr.trim();
+        
+        Serial.print(">>> Extracted hour string: '");
+        Serial.print(hourStr);
+        Serial.print("' (length: ");
+        Serial.print(hourStr.length());
+        Serial.println(")");
+        
+        // Validate that it's a valid number
+        if (hourStr.length() > 0 && hourStr.length() <= 2) {
+          bool isValidNumber = true;
+          for (unsigned int i = 0; i < hourStr.length(); i++) {
+            if (!isDigit(hourStr.charAt(i))) {
+              isValidNumber = false;
+              Serial.print(">>> Invalid character at position ");
+              Serial.print(i);
+              Serial.print(": '");
+              Serial.print(hourStr.charAt(i));
+              Serial.println("'");
+              break;
+            }
+          }
+          
+          if (isValidNumber) {
+            int hour = hourStr.toInt();
+            
+            Serial.print(">>> Parsed hour value: ");
+            Serial.println(hour);
+            
+            if (hour >= 0 && hour <= 23) {
+              Serial.print(">>> ROUTING to handleSetHourProfile for HOUR ");
+              Serial.println(hour);
+              Serial.println("========================================");
+              this->handleSetHourProfile(request, data, len);
+              return;
+            } else {
+              Serial.print(">>> Hour out of range (0-23): ");
+              Serial.println(hour);
+            }
+          } else {
+            Serial.println(">>> Hour string contains non-digit characters");
+          }
+        } else {
+          Serial.print(">>> Hour string length invalid: ");
+          Serial.println(hourStr.length());
+        }
+      } else {
+        Serial.println(">>> URL does not contain '/api/schedule/hourly/' - treating as full schedule");
+      }
+      
+      // Otherwise, handle as full 24-hour schedule update
+      Serial.println(">>> ROUTING to handleSetHourlySchedule for ALL 24 HOURS");
+      Serial.println("========================================");
       this->handleSetHourlySchedule(request, data, len);
     }
   );
-  
-  // Get specific hour profile
-  server->on("^\\/api\\/schedule\\/hourly\\/([0-9]+)$", HTTP_GET, [this](AsyncWebServerRequest *request) {
-    this->handleGetHourProfile(request);
-  });
 }
 
 void WiFiService::handleCors(AsyncWebServerRequest* request) {
@@ -419,12 +527,19 @@ void WiFiService::handleSetTime(AsyncWebServerRequest* request, uint8_t* data, s
 void WiFiService::handleSetMode(AsyncWebServerRequest* request, uint8_t* data, size_t len) {
   String jsonString = String((char*)data);
   
+  Serial.println("========================================");
+  Serial.print("RECEIVED MODE CHANGE REQUEST: ");
+  Serial.println(jsonString);
+  Serial.println("========================================");
+  
   // Parse JSON
   StaticJsonDocument<100> doc;
   DeserializationError error = deserializeJson(doc, jsonString);
   
   // Check for parsing errors
   if (error) {
+    Serial.print("ERROR: JSON parsing failed: ");
+    Serial.println(error.c_str());
     request->send(400, "text/plain", String("JSON parsing failed: ") + error.c_str());
     return;
   }
@@ -434,28 +549,40 @@ void WiFiService::handleSetMode(AsyncWebServerRequest* request, uint8_t* data, s
   // Extract mode value
   if (doc.containsKey("mode")) {
     mode = doc["mode"].as<String>();
+    Serial.print("Extracted mode value: ");
+    Serial.println(mode);
+  } else {
+    Serial.println("ERROR: Missing 'mode' key in JSON");
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing mode key\"}");
+    return;
   }
   
   if (mode == "manual") {
+    Serial.println(">>> Processing MANUAL mode request...");
     ledController->setOffMode(false); // Disable off mode
     ledController->enableManualMode(true);
-    Serial.println("Switched to manual mode");
+    Serial.println(">>> MANUAL mode activated");
     request->send(200, "application/json", "{\"status\":\"success\"}");
   } else if (mode == "auto") {
-    ledController->setOffMode(false); // Disable off mode
-    ledController->enableManualMode(false);
-    Serial.println("Switched to auto mode");
+    Serial.println(">>> Processing AUTO mode request...");
+    ledController->setOffMode(false); // Disable off mode first
+    Serial.println(">>> Off mode disabled");
+    ledController->enableManualMode(false); // This now triggers immediate LED update
+    Serial.println(">>> AUTO mode activated - LEDs should now follow schedule");
     request->send(200, "application/json", "{\"status\":\"success\"}");
   } else if (mode == "off") {
+    Serial.println(">>> Processing OFF mode request...");
     // Turn off all LEDs and set off mode
     ledController->setOffMode(true);
-    Serial.println("Switched to off mode - all LEDs turned off");
+    Serial.println(">>> OFF mode activated - all LEDs turned off");
     request->send(200, "application/json", "{\"status\":\"success\"}");
   } else {
-    Serial.print("Invalid mode received: ");
+    Serial.print("ERROR: Invalid mode received: ");
     Serial.println(mode);
     request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid mode. Valid modes: manual, auto, off\"}");
   }
+  
+  Serial.println("========================================");
 }
 
 void WiFiService::handleGetMode(AsyncWebServerRequest* request) {
@@ -755,18 +882,46 @@ void WiFiService::handleGetHourlySchedule(AsyncWebServerRequest* request) {
 
 void WiFiService::handleSetHourlySchedule(AsyncWebServerRequest* request, uint8_t* data, size_t len) {
   String jsonString = String((char*)data);
+  String url = request->url();
   
-  Serial.print("Received hourly schedule update: ");
+  // Check if this is actually a per-hour request (e.g., /api/schedule/hourly/17)
+  // If so, delegate to handleSetHourProfile instead
+  if (url.indexOf("/api/schedule/hourly/") >= 0 && url.length() > 22) {
+    // Extract hour from URL manually
+    String afterBase = url.substring(22); // After "/api/schedule/hourly/"
+    int hour = afterBase.toInt();
+    
+    if (hour >= 0 && hour <= 23) {
+      Serial.println("========================================");
+      Serial.print(">>> DELEGATING TO handleSetHourProfile for HOUR ");
+      Serial.println(hour);
+      Serial.println("========================================");
+      
+      // Call the hour-specific handler directly
+      handleSetHourProfile(request, data, len);
+      return;
+    }
+  }
+  
+  Serial.print("Received hourly schedule update (ALL 24 HOURS): ");
   Serial.println(jsonString);
+  Serial.print("Payload size: ");
+  Serial.print(len);
+  Serial.println(" bytes");
   
-  // Parse JSON to validate
-  StaticJsonDocument<4096> doc;
+  // Parse JSON to validate - INCREASED BUFFER SIZE to 6144 bytes for 24-hour schedule
+  DynamicJsonDocument doc(6144);
   DeserializationError error = deserializeJson(doc, jsonString);
   
   if (error) {
     Serial.print("JSON parsing failed: ");
     Serial.println(error.c_str());
-    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
+    
+    String errorResponse = "{\"status\":\"error\",\"message\":\"Invalid JSON format: ";
+    errorResponse += error.c_str();
+    errorResponse += "\"}";
+    
+    request->send(400, "application/json", errorResponse);
     return;
   }
   
@@ -807,6 +962,81 @@ void WiFiService::handleGetHourProfile(AsyncWebServerRequest* request) {
   serializeJson(doc, output);
   
   request->send(200, "application/json", output);
+}
+
+void WiFiService::handleSetHourProfile(AsyncWebServerRequest* request, uint8_t* data, size_t len) {
+  // Extract hour from URL path
+  String path = request->url();
+  int lastSlash = path.lastIndexOf('/');
+  String hourStr = path.substring(lastSlash + 1);
+  
+  int hour = hourStr.toInt();
+  
+  Serial.println("========================================");
+  Serial.print(">>> RECEIVED HOUR PROFILE UPDATE for HOUR ");
+  Serial.println(hour);
+  Serial.println("========================================");
+  
+  if (hour < 0 || hour > 23) {
+    Serial.println("ERROR: Invalid hour value!");
+    request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid hour (must be 0-23)\"}");
+    return;
+  }
+  
+  String jsonString = String((char*)data);
+  
+  Serial.print("Raw JSON received (");
+  Serial.print(len);
+  Serial.print(" bytes): ");
+  Serial.println(jsonString);
+  
+  // Parse JSON
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, jsonString);
+  
+  if (error) {
+    Serial.print("ERROR: JSON parsing failed: ");
+    Serial.println(error.c_str());
+    
+    String errorResponse = "{\"status\":\"error\",\"message\":\"Invalid JSON format: ";
+    errorResponse += error.c_str();
+    errorResponse += "\"}";
+    
+    request->send(400, "application/json", errorResponse);
+    return;
+  }
+  
+  // Create LightProfile from JSON
+  LightProfile profile;
+  profile.royalBlue = doc.containsKey("royalBlue") ? (uint8_t)doc["royalBlue"] : 0;
+  profile.blue = doc.containsKey("blue") ? (uint8_t)doc["blue"] : 0;
+  profile.uv = doc.containsKey("uv") ? (uint8_t)doc["uv"] : 0;
+  profile.violet = doc.containsKey("violet") ? (uint8_t)doc["violet"] : 0;
+  profile.red = doc.containsKey("red") ? (uint8_t)doc["red"] : 0;
+  profile.green = doc.containsKey("green") ? (uint8_t)doc["green"] : 0;
+  profile.white = doc.containsKey("white") ? (uint8_t)doc["white"] : 0;
+  
+  Serial.println("Parsed profile values:");
+  Serial.print("  Royal Blue: "); Serial.println(profile.royalBlue);
+  Serial.print("  Blue: "); Serial.println(profile.blue);
+  Serial.print("  UV: "); Serial.println(profile.uv);
+  Serial.print("  Violet: "); Serial.println(profile.violet);
+  Serial.print("  Red: "); Serial.println(profile.red);
+  Serial.print("  Green: "); Serial.println(profile.green);
+  Serial.print("  White: "); Serial.println(profile.white);
+  
+  // Set the profile for this hour
+  Serial.print(">>> SAVING to hourlySchedule[");
+  Serial.print(hour);
+  Serial.println("]...");
+  ledController->setHourlyProfile(hour, profile);
+  
+  Serial.print(">>> Hour ");
+  Serial.print(hour);
+  Serial.println(" profile SAVED TO MEMORY successfully");
+  Serial.println("========================================");
+  
+  request->send(200, "application/json", "{\"status\":\"success\",\"message\":\"Hour profile updated\"}");
 }
 
 // Destructor untuk membersihkan sumber daya
